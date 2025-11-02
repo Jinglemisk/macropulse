@@ -1,0 +1,27 @@
+{
+  "name": "portfolio-app",
+  "version": "1.0.0",
+  "description": "Investment dashboard for tracking stock classifications across macro regimes",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node backend/server.js",
+    "init-db": "node scripts/initDb.js",
+    "fetch-macro": "node scripts/fetchMacroData.js",
+    "dev:all": "concurrently \"npm run dev\" \"cd frontend && npm run dev\""
+  },
+  "keywords": ["finance", "investment", "dashboard", "stocks"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^9.2.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
