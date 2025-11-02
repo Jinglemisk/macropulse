@@ -85,7 +85,17 @@ async function getFundamentals(ticker) {
 async function fetchJSON(url) {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    // Get response body for more details
+    const text = await response.text();
+
+    // Check for premium/subscription errors (HTTP 402)
+    if (response.status === 402) {
+      throw new Error(`This stock requires a premium FMP subscription. The free tier doesn't include detailed data for this ticker. Consider upgrading at https://financialmodelingprep.com/pricing or try a different stock.`);
+    }
+
+    // Include response body in error if available
+    const errorDetail = text ? ` - ${text.substring(0, 200)}` : '';
+    throw new Error(`HTTP ${response.status}: ${response.statusText}${errorDetail}`);
   }
   return response.json();
 }

@@ -415,7 +415,10 @@ module.exports = {
     },
     D: {
       revenueGrowthThreshold: 50,  // Gate trigger
-      fallbackRevGrowth: { center: 60, halfwidth: 20 }
+      // Fallback scoring (if gates don't trigger)
+      revenueGrowth: { center: 60, halfwidth: 30 },
+      epsGrowth: { center: 80, halfwidth: 40 },
+      peForward: { center: 150, halfwidth: 100 }
     }
   },
 
@@ -435,6 +438,37 @@ module.exports = {
   cacheTTL: 24 * 60 * 60 * 1000
 };
 ```
+
+---
+
+### Class D: Hypergrowth Stock Scoring
+
+Class D represents hypergrowth companies and uses a unique two-tier scoring system:
+
+#### Tier 1: Gate Triggers (Score = 1.0)
+Any of these conditions automatically assigns a Class D score of 1.0:
+- **Revenue Growth ≥ 50%** - Extreme hypergrowth
+- **EPS not positive** - Pre-profit company
+- **EBITDA not positive** - Pre-profit company
+- **P/E not available** - No earnings to price
+
+#### Tier 2: Multi-Metric Fallback (if gates don't trigger)
+For profitable companies with moderate growth but hypergrowth characteristics, Class D uses a multi-metric approach averaging three scores:
+
+1. **Revenue Growth**: center 60%, halfwidth 30% (range: 30-90%)
+2. **EPS Growth**: center 80%, halfwidth 40% (range: 40-120%)
+3. **P/E Forward**: center 150x, halfwidth 100x (range: 50-250x)
+
+This captures "profitable hypergrowth" companies like PLTR that have:
+- Moderate revenue growth (< 50%)
+- Exceptional earnings growth (> 80%)
+- Extreme valuations (> 100x P/E)
+
+**Example: Palantir (PLTR)**
+- Revenue Growth: 28.8% → tri(28.8, 60, 30) = 0%
+- EPS Growth: 114.9% → tri(114.9, 80, 40) = 12.75%
+- P/E: 621.2x → tri(621.2, 150, 100) = 0%
+- **Class D Score: 4.25%** (average of three metrics)
 
 ---
 
@@ -500,9 +534,15 @@ function classifyStock(fundamentals) {
 
   if (dGateTrigger) {
     D = 1.0;
-  } else if (revenueGrowth !== null) {
-    // Fallback scoring if gate not triggered
-    D = tri(revenueGrowth, targets.D.fallbackRevGrowth.center, targets.D.fallbackRevGrowth.halfwidth);
+  } else {
+    // Fallback scoring using multi-metric approach (like A/B/C)
+    const dScores = [
+      tri(revenueGrowth, targets.D.revenueGrowth.center, targets.D.revenueGrowth.halfwidth),
+      tri(epsGrowth, targets.D.epsGrowth.center, targets.D.epsGrowth.halfwidth),
+      tri(peForward, targets.D.peForward.center, targets.D.peForward.halfwidth)
+    ].filter(score => score !== null);
+
+    D = dScores.length > 0 ? average(dScores) : 0;
   }
 
   // --- Final Classification ---
@@ -1709,7 +1749,8 @@ test('Adding a stock fetches data and classifies', async () => {
    - [ ] Microsoft (MSFT) → Should be B
    - [ ] Tesla (TSLA) → Should be C or D
    - [ ] Coca-Cola (KO) → Should be A
-   - [ ] Snowflake (SNOW) → Should be D
+   - [ ] Palantir (PLTR) → Should score in Class D (profitable hypergrowth)
+   - [ ] Snowflake (SNOW) → Should be D (pre-profit gate trigger)
 
 2. **Regime Calculation:**
    - [ ] Verify FRED data is up to date
@@ -2007,8 +2048,8 @@ Tri(x, center, halfwidth) = max(0, 1 - |x - center| / halfwidth)
 ```
 
 **Class Scores:**
-- A, B, C: Average of 4 metric scores
-- D: 1.0 if gate triggered, else Tri(rev_g, 60, 20)
+- A, B, C: Average of 4 metric scores (revenue growth, EPS growth, P/E, debt/EBITDA)
+- D: 1.0 if gate triggered, else average of 3 metric scores (revenue growth, EPS growth, P/E)
 
 **Confidence:**
 ```
@@ -2076,6 +2117,22 @@ Before considering MVP complete:
 **Status:** ✅ COMPLETED - MVP Fully Implemented
 
 **Date Completed:** November 1, 2025
+
+### Recent Updates
+
+#### November 2, 2025 - Enhanced Class D Scoring
+**Problem Identified:** Class D scoring only used revenue growth in the fallback path, causing profitable hypergrowth companies with extreme valuations (like PLTR with 621x P/E and 115% EPS growth) to score 0% in Class D despite clearly exhibiting hypergrowth characteristics.
+
+**Solution Implemented:** Updated Class D fallback scoring to use a multi-metric approach similar to Classes A/B/C:
+- Added **EPS Growth** scoring (center: 80%, halfwidth: 40%)
+- Added **P/E Forward** scoring (center: 150x, halfwidth: 100x)
+- Widened **Revenue Growth** halfwidth from 20% to 30%
+
+**Impact:** Class D now properly scores "profitable hypergrowth" companies - those with extreme valuations and high earnings growth, even if revenue growth is below the 50% gate threshold.
+
+**Files Modified:**
+- `backend/config.js` - Added Class D targets for epsGrowth and peForward
+- `backend/services/classifier.js` - Implemented multi-metric scoring for Class D fallback
 
 ### What Was Built
 
@@ -2289,11 +2346,12 @@ All endpoints available at `http://localhost:3001/api`:
 ### Testing Recommendations
 
 Test with these stocks to verify all classes:
-- **KO** (Coca-Cola) → Expected: Class A (mature, low growth)
-- **MSFT** (Microsoft) → Expected: Class B (steady growth)
-- **AAPL** (Apple) → Expected: Class B (steady growth, ~6% revenue growth)
-- **NVDA** (NVIDIA) → Expected: Class D (hypergrowth, 114% revenue growth triggers D gate)
-- **SNOW** (Snowflake) → Expected: Class D (hypergrowth/pre-profit)
+- **KO** (Coca-Cola) → Expected: Class A (mature, low growth, stable metrics)
+- **MSFT** (Microsoft) → Expected: Class B (steady growth, balanced fundamentals)
+- **AAPL** (Apple) → Expected: Class B or C (moderate growth, ~6% revenue growth)
+- **NVDA** (NVIDIA) → Expected: Class D (hypergrowth, revenue growth triggers D gate)
+- **PLTR** (Palantir) → Expected: Class D or C (profitable hypergrowth, 115% EPS growth, 621x P/E)
+- **SNOW** (Snowflake) → Expected: Class D (pre-profit triggers D gate)
 
 ### Known Limitations (By Design)
 
@@ -2301,8 +2359,12 @@ Test with these stocks to verify all classes:
 2. No input sanitization beyond basic validation
 3. No automated tests (manual testing only)
 4. FMP free tier limited to 250 calls/day
-5. No real-time data (daily refresh recommended)
-6. No backup or sync features
+5. **FMP free tier excludes certain "premium-only" stocks** (e.g., SMCI)
+   - Some tickers require paid subscription for detailed fundamentals
+   - App will show clear error: "This stock requires a premium FMP subscription..."
+   - See `KNOWN_PREMIUM_TICKERS.md` for list of affected stocks
+6. No real-time data (daily refresh recommended)
+7. No backup or sync features
 
 ### Future Enhancements (v2)
 
@@ -2344,6 +2406,13 @@ npm run fetch-macro
 - Cache responses last 24 hours automatically
 - Use "Refresh All" sparingly
 - Consider upgrading FMP plan for more calls
+
+**"HTTP 402: Payment Required" Error:**
+- This means the stock requires a premium FMP subscription
+- The free tier doesn't include all stocks (e.g., SMCI)
+- **Solution**: Try a different stock or upgrade your FMP plan
+- Most major stocks (AAPL, MSFT, NVDA, TSLA, AMZN, META, GOOGL) work fine
+- See `KNOWN_PREMIUM_TICKERS.md` for list of affected stocks
 
 **Classification Issues:**
 - Adjust `center` and `halfwidth` in `backend/config.js`
