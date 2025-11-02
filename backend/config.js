@@ -22,8 +22,11 @@ module.exports = {
       debtEbitda: { center: 5.0, halfwidth: 2.0 }
     },
     D: {
-      revenueGrowthThreshold: 50,
-      fallbackRevGrowth: { center: 60, halfwidth: 20 }
+      revenueGrowthThreshold: 50,  // Gate trigger
+      // Fallback scoring (if gates don't trigger)
+      revenueGrowth: { center: 60, halfwidth: 30 },
+      epsGrowth: { center: 80, halfwidth: 40 },
+      peForward: { center: 150, halfwidth: 100 }
     }
   },
 

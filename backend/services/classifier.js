@@ -54,9 +54,15 @@ function classifyStock(fundamentals) {
 
   if (dGateTrigger) {
     D = 1.0;
-  } else if (revenueGrowth !== null) {
-    // Fallback scoring if gate not triggered
-    D = tri(revenueGrowth, targets.D.fallbackRevGrowth.center, targets.D.fallbackRevGrowth.halfwidth) || 0;
+  } else {
+    // Fallback scoring using multi-metric approach (like A/B/C)
+    const dScores = [
+      tri(revenueGrowth, targets.D.revenueGrowth.center, targets.D.revenueGrowth.halfwidth),
+      tri(epsGrowth, targets.D.epsGrowth.center, targets.D.epsGrowth.halfwidth),
+      tri(peForward, targets.D.peForward.center, targets.D.peForward.halfwidth)
+    ].filter(score => score !== null);
+
+    D = dScores.length > 0 ? average(dScores) : 0;
   }
 
   // --- Final Classification ---
