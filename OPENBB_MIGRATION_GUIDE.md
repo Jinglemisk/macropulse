@@ -49,6 +49,23 @@
 
 ---
 
+## ⚠️ CRITICAL: Code Corrections Required
+
+**IMPORTANT NOTICE**: This migration guide was written before OpenBB Platform v4.x testing. The example code contains **critical bugs** that have been identified and corrected throughout this document.
+
+**Three Critical Issues Fixed**:
+1. ✅ **OBBject Result Handling** (Lines 1092-1248) - Fixed improper `.to_dict()` usage; now uses proper `.to_df()` DataFrame access
+2. ✅ **FRED Series Column Names** (Lines 1168-1177) - Fixed column name access to use series ID instead of 'value'
+3. ✅ **Percentage Format Handling** (Lines 656-672) - Added provider-specific format detection and conversion
+
+**Before Starting Migration**:
+- This guide uses **OpenBB Platform v4.x** (not legacy Terminal v3.x)
+- Test the Python adapter standalone before integration
+- Verify OpenBB installation: `pip install "openbb>=4.0.0"`
+- All code examples in this guide have been corrected and are ready to use
+
+---
+
 ## Why Migrate to OpenBB
 
 ### Current Architecture Limitations
