@@ -36,7 +36,7 @@
 - ✅ Enables access to 100+ data providers
 - ✅ Expands macro data (CPI, GDP, unemployment, yields)
 
-### Implementation Approach: Option 2 (Child-Process Bridge)
+### Implementation Approach: Child-Process Bridge
 
 **Node.js backend spawns Python scripts when needed** to access OpenBB, then caches results for 24 hours.
 
@@ -46,15 +46,6 @@
 - ✅ Lower resource usage (Python only when needed)
 - ✅ Node.js stays primary runtime
 - ✅ Easy to maintain and debug
-
-### Timeline Estimate
-
-- **Setup & Infrastructure**: 2-3 hours
-- **Migration of Existing APIs**: 3-4 hours
-- **Provider Redundancy**: 2-3 hours
-- **Expand Macro Data**: 2-3 hours
-- **Testing & Validation**: 2-3 hours
-- **Total**: ~12-16 hours focused development
 
 ---
 
@@ -124,7 +115,7 @@ obb.equity.fundamental.metrics('AAPL', provider='yfinance')
 
 **✅ Regime Calculator** - Enhanced, not replaced
 - Keep existing logic
-- Optionally add new indicators
+- Calculator will update at a future time by utilizing the new parameters.
 
 ---
 
