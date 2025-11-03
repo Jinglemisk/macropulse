@@ -418,7 +418,8 @@ module.exports = {
       // Fallback scoring (if gates don't trigger)
       revenueGrowth: { center: 60, halfwidth: 30 },
       epsGrowth: { center: 80, halfwidth: 40 },
-      peForward: { center: 150, halfwidth: 100 }
+      peForward: { center: 150, halfwidth: 100 },
+      debtEbitda: { center: 8.0, halfwidth: 4.0 }  // High leverage signals hypergrowth
     }
   },
 
@@ -453,22 +454,31 @@ Any of these conditions automatically assigns a Class D score of 1.0:
 - **P/E not available** - No earnings to price
 
 #### Tier 2: Multi-Metric Fallback (if gates don't trigger)
-For profitable companies with moderate growth but hypergrowth characteristics, Class D uses a multi-metric approach averaging three scores:
+For profitable companies with moderate growth but hypergrowth characteristics, Class D uses a multi-metric approach averaging four scores:
 
 1. **Revenue Growth**: center 60%, halfwidth 30% (range: 30-90%)
 2. **EPS Growth**: center 80%, halfwidth 40% (range: 40-120%)
 3. **P/E Forward**: center 150x, halfwidth 100x (range: 50-250x)
+4. **Debt/EBITDA**: center 8.0x, halfwidth 4.0x (range: 4-12x) - **High leverage signals hypergrowth**
 
-This captures "profitable hypergrowth" companies like PLTR that have:
+This captures "profitable hypergrowth" companies that have:
 - Moderate revenue growth (< 50%)
 - Exceptional earnings growth (> 80%)
 - Extreme valuations (> 100x P/E)
+- High leverage (≥ 5x debt/EBITDA) - aggressively financing growth
+
+**Key Insight on Debt/EBITDA:**
+- **High debt (≥ 5x)** → Boosts Class D score (signals aggressive growth financing)
+- **Low debt (< 5x)** → Reduces Class D score (signals healthier A/B/C profile)
+- **Peak at 8x** → Maximum Class D affinity
+- Companies with low debt are penalized in Class D scoring as they exhibit mature characteristics
 
 **Example: Palantir (PLTR)**
 - Revenue Growth: 28.8% → tri(28.8, 60, 30) = 0%
 - EPS Growth: 114.9% → tri(114.9, 80, 40) = 12.75%
 - P/E: 621.2x → tri(621.2, 150, 100) = 0%
-- **Class D Score: 4.25%** (average of three metrics)
+- Debt/EBITDA: Depends on actual leverage
+- **Class D Score:** Average of four metrics
 
 ---
 
@@ -536,10 +546,12 @@ function classifyStock(fundamentals) {
     D = 1.0;
   } else {
     // Fallback scoring using multi-metric approach (like A/B/C)
+    // High debt/EBITDA (>=5x) boosts D score, low debt (<5x) reduces it
     const dScores = [
       tri(revenueGrowth, targets.D.revenueGrowth.center, targets.D.revenueGrowth.halfwidth),
       tri(epsGrowth, targets.D.epsGrowth.center, targets.D.epsGrowth.halfwidth),
-      tri(peForward, targets.D.peForward.center, targets.D.peForward.halfwidth)
+      tri(peForward, targets.D.peForward.center, targets.D.peForward.halfwidth),
+      tri(debtEbitda, targets.D.debtEbitda.center, targets.D.debtEbitda.halfwidth)
     ].filter(score => score !== null);
 
     D = dScores.length > 0 ? average(dScores) : 0;
@@ -2049,7 +2061,8 @@ Tri(x, center, halfwidth) = max(0, 1 - |x - center| / halfwidth)
 
 **Class Scores:**
 - A, B, C: Average of 4 metric scores (revenue growth, EPS growth, P/E, debt/EBITDA)
-- D: 1.0 if gate triggered, else average of 3 metric scores (revenue growth, EPS growth, P/E)
+- D: 1.0 if gate triggered, else average of 4 metric scores (revenue growth, EPS growth, P/E, debt/EBITDA)
+  - Note: High debt/EBITDA (≥5x) boosts D score; low debt (<5x) reduces it
 
 **Confidence:**
 ```
@@ -2119,6 +2132,22 @@ Before considering MVP complete:
 **Date Completed:** November 1, 2025
 
 ### Recent Updates
+
+#### November 3, 2025 - Debt/EBITDA as Active Class D Discriminator
+**Problem Identified:** Debt/EBITDA was passive in Class D calculation, not distinguishing between highly-leveraged hypergrowth companies and healthier mature companies. Low-debt companies were not being properly penalized in Class D scoring.
+
+**Solution Implemented:** Made debt/EBITDA an active discriminator for Class D:
+- Added **Debt/EBITDA** to Class D fallback scoring (center: 8.0x, halfwidth: 4.0x)
+- **High debt (≥ 5x)** now boosts Class D score (signals aggressive growth financing)
+- **Low debt (< 5x)** now reduces Class D score (signals healthier A/B/C profile)
+- Acceptable range: 4x to 12x with peak scoring at 8x
+
+**Impact:** Class D now properly identifies hypergrowth companies that leverage debt aggressively to fuel expansion, while penalizing companies with mature, low-debt balance sheets. This creates better differentiation between growth stages.
+
+**Files Modified:**
+- `backend/config.js` - Added debtEbitda target for Class D (8.0x center, 4.0x halfwidth)
+- `backend/services/classifier.js` - Included debt/EBITDA in Class D fallback scoring array
+- `Implementation.md` - Updated documentation with new Class D logic
 
 #### November 2, 2025 - Enhanced Class D Scoring
 **Problem Identified:** Class D scoring only used revenue growth in the fallback path, causing profitable hypergrowth companies with extreme valuations (like PLTR with 621x P/E and 115% EPS growth) to score 0% in Class D despite clearly exhibiting hypergrowth characteristics.
