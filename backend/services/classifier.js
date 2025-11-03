@@ -56,10 +56,12 @@ function classifyStock(fundamentals) {
     D = 1.0;
   } else {
     // Fallback scoring using multi-metric approach (like A/B/C)
+    // High debt/EBITDA (>=5x) boosts D score, low debt (<5x) reduces it
     const dScores = [
       tri(revenueGrowth, targets.D.revenueGrowth.center, targets.D.revenueGrowth.halfwidth),
       tri(epsGrowth, targets.D.epsGrowth.center, targets.D.epsGrowth.halfwidth),
-      tri(peForward, targets.D.peForward.center, targets.D.peForward.halfwidth)
+      tri(peForward, targets.D.peForward.center, targets.D.peForward.halfwidth),
+      tri(debtEbitda, targets.D.debtEbitda.center, targets.D.debtEbitda.halfwidth)
     ].filter(score => score !== null);
 
     D = dScores.length > 0 ? average(dScores) : 0;

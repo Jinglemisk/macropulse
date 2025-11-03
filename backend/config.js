@@ -26,7 +26,8 @@ module.exports = {
       // Fallback scoring (if gates don't trigger)
       revenueGrowth: { center: 60, halfwidth: 30 },
       epsGrowth: { center: 80, halfwidth: 40 },
-      peForward: { center: 150, halfwidth: 100 }
+      peForward: { center: 150, halfwidth: 100 },
+      debtEbitda: { center: 8.0, halfwidth: 4.0 }  // High leverage signals hypergrowth
     }
   },
 
