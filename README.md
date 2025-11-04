@@ -17,8 +17,8 @@ A Bloomberg Terminal-inspired dashboard for tracking stock classifications acros
 **Backend:**
 - Node.js + Express
 - SQLite (better-sqlite3)
-- Financial Modeling Prep API
-- FRED API
+- **OpenBB Platform** (unified API gateway with provider redundancy)
+- **Python 3.10+** (required for OpenBB Platform)
 
 **Frontend:**
 - React 18
@@ -26,9 +26,16 @@ A Bloomberg Terminal-inspired dashboard for tracking stock classifications acros
 - Tailwind CSS
 - Axios
 
+**Data Providers** (via OpenBB):
+- Financial Modeling Prep (FMP)
+- Yahoo Finance (yfinance)
+- FRED (Federal Reserve Economic Data)
+- Intrinio (optional)
+
 ## Prerequisites
 
-- Node.js 18+
+- **Node.js 18+**
+- **Python 3.10+** (required for OpenBB Platform)
 - npm or yarn
 - API Keys:
   - [Financial Modeling Prep](https://financialmodelingprep.com/) (free tier: 250 calls/day)
@@ -36,7 +43,25 @@ A Bloomberg Terminal-inspired dashboard for tracking stock classifications acros
 
 ## Installation
 
-### 1. Clone and Install Dependencies
+### 1. Install Python & OpenBB Platform
+
+**Install Python 3.10+:**
+```bash
+# Check Python version
+python3 --version
+
+# If not installed, download from: https://www.python.org/downloads/
+```
+
+**Install OpenBB Platform:**
+```bash
+pip3 install openbb
+
+# Verify installation
+python3 -c "from openbb import obb; print('✅ OpenBB Platform installed successfully')"
+```
+
+### 2. Clone and Install Dependencies
 
 ```bash
 # Navigate to project directory
@@ -51,7 +76,7 @@ npm install
 cd ..
 ```
 
-### 2. Configure Environment
+### 3. Configure Environment
 
 Copy `.env.example` to `.env` and add your API keys:
 
@@ -61,14 +86,29 @@ cp .env.example .env
 
 Edit `.env`:
 ```bash
+# OpenBB API Keys (automatically detected by OpenBB Platform)
+OPENBB_FMP_API_KEY=your_fmp_api_key_here
+OPENBB_FRED_API_KEY=your_fred_api_key_here
+
+# Legacy keys (kept for backwards compatibility)
 FMP_API_KEY=your_fmp_api_key_here
 FRED_API_KEY=your_fred_api_key_here
+
+# Python Configuration
+PYTHON_PATH=python3
+
+# Server Configuration
 PORT=3001
 DATABASE_PATH=./data/stocks.db
 CACHE_TTL_HOURS=24
+
+# OpenBB Configuration
+OPENBB_TIMEOUT_MS=30000
+PRIMARY_FUNDAMENTALS_PROVIDER=fmp
+FALLBACK_PROVIDERS=yfinance,intrinio
 ```
 
-### 3. Initialize Database
+### 4. Initialize Database
 
 ```bash
 npm run init-db
@@ -76,13 +116,18 @@ npm run init-db
 
 This creates the SQLite database with all required tables.
 
-### 4. Fetch Initial Macro Data
+### 5. Fetch Initial Macro Data
 
 ```bash
 npm run fetch-macro
 ```
 
-This fetches 365 days of historical FRED data (Fed balance sheet + interest rates).
+This fetches 365 days of historical FRED data via OpenBB:
+- **WALCL** - Fed Balance Sheet
+- **DFF** - Fed Funds Rate
+- **T10Y2Y** - 10Y-2Y Treasury Yield Spread
+- **UNRATE** - Unemployment Rate
+- **CPIAUCSL** - Consumer Price Index
 
 ## Running the Application
 
@@ -118,7 +163,7 @@ Open your browser to: **http://localhost:5173**
 1. Enter a ticker symbol in the input field (e.g., "AAPL")
 2. Click "Add Stock"
 3. The app will:
-   - Fetch fundamentals from FMP
+   - Fetch fundamentals via OpenBB (tries yfinance → fmp → intrinio)
    - Calculate classification scores
    - Store data in database
    - Display results immediately
@@ -202,10 +247,17 @@ portfolio-app/
 │   ├── server.js              # Express app
 │   ├── database.js            # SQLite setup
 │   ├── config.js              # Configuration
+│   ├── adapters/              # ✨ NEW: OpenBB Integration
+│   │   └── openbb_adapter.py  # Python CLI for OpenBB Platform
+│   ├── apis/                  # API abstraction layer
+│   │   ├── openbb.js          # ✨ NEW: Node.js → Python bridge
+│   │   ├── fmp.js             # Fundamentals (via OpenBB)
+│   │   ├── fred.js            # Macro data (via OpenBB)
+│   │   └── cache.js           # API response caching
 │   ├── routes/                # API endpoints
 │   ├── services/              # Business logic
-│   ├── apis/                  # External API clients
 │   └── utils/                 # Helper functions
+│       └── providerHealth.js  # ✨ NEW: Provider health tracking
 ├── frontend/
 │   └── src/
 │       ├── App.jsx            # Main app component
@@ -219,6 +271,12 @@ portfolio-app/
     ├── initDb.js              # Database initialization
     └── fetchMacroData.js      # FRED data fetcher
 ```
+
+**Key Architecture:**
+- **OpenBB Platform**: Python package providing unified API access
+- **Child Process Bridge**: Node.js spawns Python scripts to access OpenBB
+- **Provider Redundancy**: Automatic fallback (yfinance → fmp → intrinio)
+- **Health Tracking**: Monitors provider success rates, prioritizes reliable sources
 
 ## Customization
 
@@ -272,10 +330,16 @@ npm run fetch-macro
 
 ### API Rate Limits
 
-FMP free tier allows 250 calls/day. Each stock addition uses ~4 calls. To conserve:
-- Use caching (automatic, 24-hour TTL)
+**With OpenBB Provider Redundancy:**
+- Primary provider failure triggers automatic fallback
+- yfinance is free and unlimited (used first by default)
+- FMP free tier: 250 calls/day (fallback provider)
+- Multiple providers reduce the impact of rate limits
+
+**To conserve API calls:**
+- Caching is automatic (24-hour TTL)
 - Don't refresh all stocks frequently
-- Consider upgrading FMP plan if needed
+- Provider health tracking prioritizes working providers
 
 ### Classification Seems Wrong
 
@@ -313,7 +377,12 @@ This needs to be run once initially and occasionally to update macro data.
 1. **stocks**: Portfolio stocks with company info
 2. **fundamentals**: Latest fundamental metrics
 3. **classification_history**: Daily classification scores
-4. **macro_data**: FRED data (WALCL, DFF)
+4. **macro_data**: FRED data (5 series)
+   - WALCL - Fed Balance Sheet
+   - DFF - Fed Funds Rate
+   - T10Y2Y - 10Y-2Y Treasury Yield Spread ✨ NEW
+   - UNRATE - Unemployment Rate ✨ NEW
+   - CPIAUCSL - Consumer Price Index ✨ NEW
 5. **api_cache**: API response cache
 
 See `Implementation.md` for detailed schema documentation.

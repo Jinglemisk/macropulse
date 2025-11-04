@@ -86,20 +86,40 @@ Build a Bloomberg Terminal-inspired dashboard to:
 └─────────────────────────────────────────────────────────────┘
                             ↕
 ┌─────────────────────────────────────────────────────────────┐
-│                  External APIs                               │
-│  - Financial Modeling Prep (fundamentals)                   │
-│  - Yahoo Finance (backup)                                    │
-│  - FRED (macro data: WALCL, DFF)                            │
+│                  OpenBB Platform Integration                 │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Node.js Bridge (openbb.js)                           │  │
+│  │  - Spawns Python child processes                      │  │
+│  │  - Handles JSON communication                         │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                            ↕                                 │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Python Adapter (openbb_adapter.py)                   │  │
+│  │  - OpenBB Platform v4.5.0                             │  │
+│  │  - Provider fallback logic                            │  │
+│  │  - Data normalization                                 │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                            ↕
+┌─────────────────────────────────────────────────────────────┐
+│               Data Providers (via OpenBB)                    │
+│  - yfinance (primary, free & unlimited)                     │
+│  - Financial Modeling Prep (fallback)                       │
+│  - Intrinio (fallback)                                       │
+│  - FRED (5 macro series: WALCL, DFF, T10Y2Y, UNRATE, CPI)  │
 └─────────────────────────────────────────────────────────────┘
                             ↕
 ┌─────────────────────────────────────────────────────────────┐
 │                 Local Storage (SQLite)                       │
 │  - stocks table                                              │
 │  - classification_history table                              │
-│  - macro_data table                                          │
+│  - macro_data table (expanded to 5 series)                  │
 │  - api_cache table                                           │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+> **⚠️ IMPORTANT**: This project uses OpenBB Platform for unified API access.
+> See [OPENBB_MIGRATION_GUIDE.md](./OPENBB_MIGRATION_GUIDE.md) for architecture details.
 
 ### Tech Stack
 
@@ -114,8 +134,9 @@ Build a Bloomberg Terminal-inspired dashboard to:
 - Node.js 18+
 - Express.js (REST API)
 - better-sqlite3 (SQLite driver)
-- node-fetch (API calls)
-- node-cron (scheduled tasks)
+- **Python 3.10+** (for OpenBB Platform)
+- **OpenBB Platform v4.5.0** (unified API gateway)
+- Child process bridge (Node.js ↔ Python)
 
 **Development:**
 - Vite (fast dev server + build tool)
@@ -184,16 +205,22 @@ CREATE TABLE classification_history (
 ```
 
 #### 4. `macro_data`
-Fed balance sheet and interest rate data from FRED.
+Economic data from FRED (via OpenBB Platform).
 
 ```sql
 CREATE TABLE macro_data (
     date TEXT PRIMARY KEY,     -- ISO 8601 date
     walcl REAL,                -- Fed Total Assets (Billions)
     dff REAL,                  -- Daily Federal Funds Rate (%)
+    t10y2y REAL,               -- ✨ NEW: 10Y-2Y Treasury Yield Spread (%)
+    unrate REAL,               -- ✨ NEW: Unemployment Rate (%)
+    cpiaucsl REAL,             -- ✨ NEW: Consumer Price Index
     fetched_at TEXT            -- When this data was fetched
 );
 ```
+
+**Note**: The database schema was expanded during OpenBB migration to track 5 FRED series (was 2).
+These columns are added automatically via `ALTER TABLE` if they don't exist.
 
 #### 5. `api_cache`
 Generic cache for API responses (24-hour TTL).
@@ -228,6 +255,13 @@ backend/
 ├── server.js              # Express app entry point
 ├── database.js            # SQLite setup & query helpers
 ├── config.js              # Configuration (API keys, thresholds)
+├── adapters/              # ✨ NEW: OpenBB Integration
+│   └── openbb_adapter.py  # Python CLI for OpenBB Platform
+├── apis/
+│   ├── openbb.js          # ✨ NEW: Node.js → Python bridge
+│   ├── fmp.js             # Fundamentals API (via OpenBB)
+│   ├── fred.js            # FRED macro data (via OpenBB)
+│   └── cache.js           # API caching layer (24-hour TTL)
 ├── routes/
 │   ├── stocks.js          # Stock CRUD operations
 │   ├── regime.js          # Macro regime endpoint
@@ -236,15 +270,17 @@ backend/
 │   ├── classifier.js      # Classification logic
 │   ├── regimeCalculator.js# Regime calculation
 │   └── scheduler.js       # Cron jobs for daily updates
-├── apis/
-│   ├── fmp.js             # Financial Modeling Prep client
-│   ├── yahoo.js           # Yahoo Finance fallback
-│   ├── fred.js            # FRED API client
-│   └── cache.js           # API caching layer
 └── utils/
     ├── formulas.js        # Triangular closeness function
-    └── validators.js      # Input validation
+    ├── validators.js      # Input validation
+    └── providerHealth.js  # ✨ NEW: Provider health tracking
 ```
+
+**Key Changes from OpenBB Migration:**
+- **adapters/openbb_adapter.py**: Python script that interfaces with OpenBB Platform
+- **apis/openbb.js**: Node.js bridge that spawns Python child processes
+- **Provider redundancy**: fmp.js now tries multiple providers (yfinance → fmp → intrinio)
+- **Health tracking**: providerHealth.js monitors provider success/failure rates
 
 ### API Endpoints
 
@@ -1255,108 +1291,107 @@ body {
 
 ## API Integration Strategy
 
-### Financial Modeling Prep (Primary)
+> **⚠️ MIGRATED TO OPENBB PLATFORM**
+> This project now uses OpenBB Platform for unified API access with provider redundancy.
+> See [OPENBB_MIGRATION_GUIDE.md](./OPENBB_MIGRATION_GUIDE.md) for complete architecture details.
+
+### Overview
+
+The application uses a **Python child-process bridge** to access OpenBB Platform:
+1. **Node.js** (`fmp.js`, `fred.js`) calls `openbb.js`
+2. **openbb.js** spawns Python child process with `openbb_adapter.py`
+3. **Python adapter** uses OpenBB Platform to fetch data
+4. **JSON response** returned to Node.js via stdout
+5. **Provider fallback** automatic (yfinance → fmp → intrinio)
+
+### Fundamentals API (via OpenBB)
 
 **File:** `/backend/apis/fmp.js`
 
-**Base URL:** `https://financialmodelingprep.com/stable` (free tier)
-
-**Endpoints Used:**
-- `GET /profile?symbol={TICKER}&apikey={KEY}` - Company profile and sector
-- `GET /quote?symbol={TICKER}&apikey={KEY}` - Real-time price data
-- `GET /key-metrics-ttm?symbol={TICKER}&apikey={KEY}` - Financial ratios and metrics
-- `GET /financial-growth?symbol={TICKER}&apikey={KEY}&limit=1` - Growth metrics
-
 ```javascript
-const fetch = require('node-fetch');
+const openbb = require('./openbb');
 const config = require('../config');
 const { getCached, setCache } = require('./cache');
-
-const FMP_BASE_URL = 'https://financialmodelingprep.com/stable';
-const API_KEY = config.apiKeys.fmp;
+const providerHealth = require('../utils/providerHealth');
 
 /**
- * Fetch company fundamentals
+ * Fetch company fundamentals via OpenBB with provider fallback
  * @param {string} ticker
  * @returns {Object} - Parsed fundamentals with flags
  */
 async function getFundamentals(ticker) {
-  // Check cache first
-  const cacheKey = `fmp_fundamentals_${ticker}`;
+  // ✅ PRESERVED: Check cache first
+  const cacheKey = `fundamentals_${ticker}`;
   const cached = getCached(cacheKey);
   if (cached) {
-    console.log(`Cache hit for ${ticker}`);
+    console.log(`✅ Cache hit for ${ticker}`);
     return cached;
   }
 
-  try {
-    console.log(`Fetching fundamentals for ${ticker} from FMP (stable API)...`);
+  console.log(`🔄 Fetching ${ticker} via OpenBB...`);
 
-    // Fetch multiple endpoints in parallel using stable API format
-    const [profile, quote, keyMetrics, financialGrowth] = await Promise.all([
-      fetchJSON(`${FMP_BASE_URL}/profile?symbol=${ticker}&apikey=${API_KEY}`),
-      fetchJSON(`${FMP_BASE_URL}/quote?symbol=${ticker}&apikey=${API_KEY}`),
-      fetchJSON(`${FMP_BASE_URL}/key-metrics-ttm?symbol=${ticker}&apikey=${API_KEY}`),
-      fetchJSON(`${FMP_BASE_URL}/financial-growth?symbol=${ticker}&apikey=${API_KEY}&limit=1`)
-    ]);
+  // ✅ Provider fallback with health tracking
+  const baseProviders = ['yfinance', 'fmp', 'intrinio'];
+  const providers = providerHealth.sortProvidersByHealth(baseProviders);
 
-    // Parse data from stable API format
-    const companyName = profile[0]?.companyName || ticker;
-    const sector = profile[0]?.sector || null;
-    const latestPrice = quote[0]?.price || null;
+  console.log(`📊 Provider priority: ${providers.join(' → ')}`);
 
-    // Calculate P/E from earnings yield (P/E = 1 / earnings yield)
-    const earningsYield = keyMetrics[0]?.earningsYieldTTM || null;
-    const peForward = earningsYield && earningsYield > 0 ? (1 / earningsYield) : null;
+  for (const provider of providers) {
+    try {
+      const data = await openbb.getFundamentals(ticker, provider);
 
-    // Growth metrics - convert from decimal to percentage
-    const revenueGrowth = financialGrowth[0]?.revenueGrowth
-      ? financialGrowth[0].revenueGrowth * 100
-      : null;
-    const epsGrowth = financialGrowth[0]?.epsgrowth
-      ? financialGrowth[0].epsgrowth * 100
-      : null;
+      // Normalize data to match existing schema
+      const result = normalizeFundamentals(data, ticker);
 
-    // Debt metrics from key metrics TTM
-    const netDebt = keyMetrics[0]?.netDebtToEBITDATTM || null;
-    const debtEbitda = netDebt !== null && netDebt < 0 ? 0 : netDebt;
+      // ✅ Record successful fetch
+      providerHealth.recordSuccess(provider);
 
-    // Flags
-    const epsPositive = earningsYield && earningsYield > 0;
-    const ebitdaPositive = keyMetrics[0]?.evToEBITDATTM ? true : true;
-    const peAvailable = peForward !== null && peForward > 0;
+      // ✅ PRESERVED: Cache for 24 hours
+      setCache(cacheKey, result, config.cacheTTL);
 
-    const result = {
-      ticker,
-      companyName,
-      sector,
-      revenueGrowth,
-      epsGrowth,
-      peForward,
-      debtEbitda,
-      epsPositive,
-      ebitdaPositive,
-      peAvailable,
-      latestPrice,
-      priceTimestamp: new Date().toISOString()
-    };
+      console.log(`✅ ${ticker} fetched successfully from ${provider}`);
+      return result;
 
-    // Cache for 24 hours
-    setCache(cacheKey, result, config.cacheTTL);
-
-    return result;
-  } catch (error) {
-    console.error(`FMP API error for ${ticker}:`, error.message);
-    throw new Error(`Failed to fetch fundamentals for ${ticker}: ${error.message}`);
+    } catch (error) {
+      // ✅ Record failure with error details
+      providerHealth.recordFailure(provider, error.message);
+      console.warn(`⚠️ ${provider} failed for ${ticker}: ${error.message}`);
+      // Try next provider
+    }
   }
+
+  throw new Error(`Failed to fetch ${ticker} from all providers (${providers.join(', ')})`);
 }
 
-async function fetchJSON(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-  return response.json();
+/**
+ * Normalize OpenBB data to match existing classification system
+ * OpenBB Platform returns growth rates as decimals (0.08 = 8%)
+ */
+function normalizeFundamentals(openbbData, ticker) {
+  // Smart conversion: detect if format is decimal or percentage
+  const isDecimalFormat = (value) => {
+    return value !== null && value !== undefined && Math.abs(value) < 1.5;
+  };
+
+  const convertToPercentage = (value) => {
+    if (value === null || value === undefined) return null;
+    return isDecimalFormat(value) ? value * 100 : value;
+  };
+
+  return {
+    ticker,
+    companyName: openbbData.company_name || ticker,
+    sector: openbbData.sector,
+    revenueGrowth: convertToPercentage(openbbData.revenue_growth),
+    epsGrowth: convertToPercentage(openbbData.eps_growth),
+    peForward: openbbData.pe_forward,
+    debtEbitda: openbbData.debt_to_ebitda < 0 ? 0 : openbbData.debt_to_ebitda,
+    epsPositive: openbbData.eps !== null && openbbData.eps > 0,
+    ebitdaPositive: openbbData.ebitda !== null && openbbData.ebitda > 0,
+    peAvailable: openbbData.pe_forward !== null && openbbData.pe_forward > 0,
+    latestPrice: openbbData.price,
+    priceTimestamp: openbbData.timestamp || new Date().toISOString()
+  };
 }
 
 module.exports = { getFundamentals };
@@ -1364,34 +1399,43 @@ module.exports = { getFundamentals };
 
 ---
 
-### FRED API (Macro Data)
+### FRED Macro Data (via OpenBB)
 
 **File:** `/backend/apis/fred.js`
 
 ```javascript
-const fetch = require('node-fetch');
+const openbb = require('./openbb');
 const config = require('../config');
 const db = require('../database');
 
-const FRED_BASE_URL = 'https://api.stlouisfed.org/fred/series/observations';
-const API_KEY = config.apiKeys.fred;
-
 /**
- * Fetch and store FRED data for WALCL and DFF
+ * Fetch and store expanded FRED macro data via OpenBB
  * @param {number} days - Number of days to fetch (default 365)
+ *
+ * ✅ Expanded to include 5 series (was 2):
+ * - WALCL: Fed Balance Sheet
+ * - DFF: Fed Funds Rate
+ * - T10Y2Y: 10-Year minus 2-Year Treasury Yield Spread
+ * - UNRATE: Unemployment Rate
+ * - CPIAUCSL: Consumer Price Index
  */
 async function updateMacroData(days = 365) {
   const endDate = new Date().toISOString().split('T')[0];
   const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
   try {
-    // Fetch WALCL (Fed Balance Sheet)
-    const walclData = await fetchSeries('WALCL', startDate, endDate);
+    console.log(`📊 Fetching expanded FRED macro data from ${startDate} to ${endDate} via OpenBB...`);
 
-    // Fetch DFF (Fed Funds Rate)
-    const dffData = await fetchSeries('DFF', startDate, endDate);
+    // ✅ Fetch all 5 series via OpenBB Platform (parallel)
+    const [walclData, dffData, yieldCurveData, unrateData, cpiData] = await Promise.all([
+      openbb.getFredSeries('WALCL', startDate, endDate),
+      openbb.getFredSeries('DFF', startDate, endDate),
+      openbb.getFredSeries('T10Y2Y', startDate, endDate),
+      openbb.getFredSeries('UNRATE', startDate, endDate),
+      openbb.getFredSeries('CPIAUCSL', startDate, endDate)
+    ]);
 
-    // Merge by date and insert into DB
+    // Merge all series by date
     const dateMap = new Map();
 
     walclData.forEach(obs => {
@@ -1404,37 +1448,51 @@ async function updateMacroData(days = 365) {
       dateMap.get(obs.date).dff = parseFloat(obs.value);
     });
 
-    // Insert/update in database
+    yieldCurveData.forEach(obs => {
+      if (!dateMap.has(obs.date)) dateMap.set(obs.date, {});
+      dateMap.get(obs.date).t10y2y = parseFloat(obs.value);
+    });
+
+    unrateData.forEach(obs => {
+      if (!dateMap.has(obs.date)) dateMap.set(obs.date, {});
+      dateMap.get(obs.date).unrate = parseFloat(obs.value);
+    });
+
+    cpiData.forEach(obs => {
+      if (!dateMap.has(obs.date)) dateMap.set(obs.date, {});
+      dateMap.get(obs.date).cpiaucsl = parseFloat(obs.value);
+    });
+
+    // ✅ Insert all 5 series
     const insertStmt = db.prepare(`
-      INSERT OR REPLACE INTO macro_data (date, walcl, dff, fetched_at)
-      VALUES (?, ?, ?, ?)
+      INSERT OR REPLACE INTO macro_data (date, walcl, dff, t10y2y, unrate, cpiaucsl, fetched_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
     const now = new Date().toISOString();
+    let count = 0;
 
     for (const [date, values] of dateMap) {
-      if (values.walcl && values.dff) {  // Only insert if both metrics exist
-        insertStmt.run(date, values.walcl, values.dff, now);
+      if (values.walcl || values.dff) {
+        insertStmt.run(
+          date,
+          values.walcl || null,
+          values.dff || null,
+          values.t10y2y || null,
+          values.unrate || null,
+          values.cpiaucsl || null,
+          now
+        );
+        count++;
       }
     }
 
-    console.log(`Updated ${dateMap.size} days of macro data`);
+    console.log(`✅ Updated ${count} days of expanded macro data`);
+    return count;
   } catch (error) {
-    console.error('FRED API error:', error.message);
+    console.error('❌ FRED data fetch failed:', error.message);
     throw error;
   }
-}
-
-async function fetchSeries(seriesId, startDate, endDate) {
-  const url = `${FRED_BASE_URL}?series_id=${seriesId}&api_key=${API_KEY}&file_type=json&observation_start=${startDate}&observation_end=${endDate}`;
-
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`FRED HTTP ${response.status}`);
-  }
-
-  const json = await response.json();
-  return json.observations || [];
 }
 
 module.exports = { updateMacroData };
@@ -1442,38 +1500,119 @@ module.exports = { updateMacroData };
 
 ---
 
-### API Cache Layer
+### OpenBB Node.js Bridge
+
+**File:** `/backend/apis/openbb.js`
+
+```javascript
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const path = require('path');
+
+const execFileAsync = promisify(execFile);
+
+const PYTHON_SCRIPT = path.join(__dirname, '../adapters/openbb_adapter.py');
+const PYTHON_CMD = process.env.PYTHON_PATH || 'python3';
+const TIMEOUT_MS = parseInt(process.env.OPENBB_TIMEOUT_MS) || 30000;
+
+/**
+ * Execute Python adapter script
+ * @param {string[]} args - Command-line arguments
+ * @returns {Promise<any>} Parsed JSON result
+ */
+async function executePythonScript(args) {
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      PYTHON_CMD,
+      [PYTHON_SCRIPT, ...args],
+      {
+        timeout: TIMEOUT_MS,
+        maxBuffer: 10 * 1024 * 1024,
+        env: process.env  // Pass OPENBB_* API keys
+      }
+    );
+
+    if (stderr) {
+      console.warn('Python stderr:', stderr);
+      try {
+        const errorData = JSON.parse(stderr);
+        throw new Error(errorData.error || 'Python script error');
+      } catch {
+        throw new Error(stderr);
+      }
+    }
+
+    return JSON.parse(stdout);
+
+  } catch (error) {
+    if (error.killed && error.signal === 'SIGTERM') {
+      throw new Error(`OpenBB request timed out after ${TIMEOUT_MS}ms`);
+    }
+
+    if (error.stderr) {
+      try {
+        const errorData = JSON.parse(error.stderr);
+        throw new Error(`OpenBB error: ${errorData.error}`);
+      } catch {
+        throw new Error(`Python error: ${error.stderr}`);
+      }
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Fetch stock fundamentals via OpenBB
+ * @param {string} ticker - Stock symbol
+ * @param {string} provider - Data provider (fmp, yfinance, intrinio)
+ * @returns {Promise<Object>} Fundamental metrics
+ */
+async function getFundamentals(ticker, provider = 'fmp') {
+  return await executePythonScript(['fundamentals', ticker.toUpperCase(), provider]);
+}
+
+/**
+ * Fetch FRED economic data series
+ * @param {string} seriesId - FRED series ID (e.g., 'WALCL')
+ * @param {string} startDate - Start date (YYYY-MM-DD)
+ * @param {string} endDate - End date (YYYY-MM-DD)
+ * @returns {Promise<Array>} Time series data
+ */
+async function getFredSeries(seriesId, startDate = null, endDate = null) {
+  const args = ['fred_series', seriesId];
+  if (startDate) args.push(startDate);
+  if (endDate) args.push(endDate);
+  return await executePythonScript(args);
+}
+
+module.exports = {
+  getFundamentals,
+  getFredSeries
+};
+```
+
+---
+
+### API Cache Layer (Unchanged)
 
 **File:** `/backend/apis/cache.js`
 
 ```javascript
 const db = require('../database');
 
-/**
- * Get cached API response
- * @param {string} key
- * @returns {Object|null}
- */
+// ✅ Cache layer preserved - no changes needed for OpenBB migration
+
 function getCached(key) {
   const now = new Date().toISOString();
-
   const result = db.prepare(`
     SELECT response_data FROM api_cache
     WHERE cache_key = ? AND expires_at > ?
   `).get(key, now);
 
-  if (result) {
-    return JSON.parse(result.response_data);
-  }
-  return null;
+  return result ? JSON.parse(result.response_data) : null;
 }
 
-/**
- * Store API response in cache
- * @param {string} key
- * @param {Object} data
- * @param {number} ttlMs - Time to live in milliseconds
- */
 function setCache(key, data, ttlMs) {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + ttlMs).toISOString();
@@ -1484,56 +1623,7 @@ function setCache(key, data, ttlMs) {
   `).run(key, JSON.stringify(data), now.toISOString(), expiresAt);
 }
 
-/**
- * Clear expired cache entries
- */
-function clearExpiredCache() {
-  const now = new Date().toISOString();
-  const result = db.prepare(`
-    DELETE FROM api_cache WHERE expires_at < ?
-  `).run(now);
-
-  console.log(`Cleared ${result.changes} expired cache entries`);
-}
-
-module.exports = { getCached, setCache, clearExpiredCache };
-```
-
----
-
-### Yahoo Finance (Fallback)
-
-**File:** `/backend/apis/yahoo.js`
-
-```javascript
-const fetch = require('node-fetch');
-
-/**
- * Fallback API if FMP fails
- * Uses unofficial Yahoo Finance API (yfinance-style)
- */
-async function getQuote(ticker) {
-  try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`;
-    const response = await fetch(url);
-
-    if (!response.ok) throw new Error(`Yahoo HTTP ${response.status}`);
-
-    const data = await response.json();
-    const quote = data.chart.result[0].meta;
-
-    return {
-      ticker,
-      latestPrice: quote.regularMarketPrice,
-      priceTimestamp: new Date(quote.regularMarketTime * 1000).toISOString()
-    };
-  } catch (error) {
-    console.error(`Yahoo Finance error for ${ticker}:`, error.message);
-    return null;
-  }
-}
-
-module.exports = { getQuote };
+module.exports = { getCached, setCache };
 ```
 
 ---
@@ -1790,6 +1880,8 @@ portfolio-app/
 │   ├── server.js
 │   ├── database.js
 │   ├── config.js
+│   ├── adapters/                    # ✨ NEW: OpenBB Integration
+│   │   └── openbb_adapter.py        # Python CLI for OpenBB Platform
 │   ├── routes/
 │   │   ├── stocks.js
 │   │   ├── regime.js
@@ -1799,11 +1891,12 @@ portfolio-app/
 │   │   ├── regimeCalculator.js
 │   │   └── scheduler.js
 │   ├── apis/
-│   │   ├── fmp.js
-│   │   ├── yahoo.js
-│   │   ├── fred.js
-│   │   └── cache.js
+│   │   ├── openbb.js                # ✨ NEW: Node.js → Python bridge
+│   │   ├── fmp.js                   # Fundamentals (via OpenBB)
+│   │   ├── fred.js                  # Macro data (via OpenBB)
+│   │   └── cache.js                 # API response caching
 │   ├── utils/
+│   │   ├── providerHealth.js        # ✨ NEW: Provider health tracking
 │   │   ├── formulas.js
 │   │   └── validators.js
 │   └── tests/

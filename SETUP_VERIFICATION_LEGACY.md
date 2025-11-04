@@ -1,8 +1,23 @@
-# Setup Verification Report
+# Setup Verification Report (LEGACY)
+
+> ⚠️ **DEPRECATED - November 4, 2025**
+>
+> This document reflects the **pre-OpenBB architecture** (direct FMP/FRED API integration).
+>
+> **The application has been migrated to OpenBB Platform.**
+>
+> For current setup and verification instructions, see:
+> - **[OPENBB_MIGRATION_GUIDE.md](./OPENBB_MIGRATION_GUIDE.md)** - Migration details
+> - **[README.md](./README.md)** - Updated setup instructions
+> - **[Implementation.md](./Implementation.md)** - Current architecture
+>
+> This file is kept for historical reference only.
+
+---
 
 **Date:** October 31, 2025 (Initial Setup)
 **Last Updated:** November 1, 2025 (FMP API Fix)
-**Status:** ✅ ALL TESTS PASSED
+**Status:** ✅ ALL TESTS PASSED (for legacy architecture)
 
 ## Summary
 
