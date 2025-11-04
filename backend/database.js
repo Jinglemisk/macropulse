@@ -65,6 +65,26 @@ function initializeTables() {
     )
   `);
 
+  // ✅ NEW (Phase 6): Add expanded macro indicators if they don't exist
+  // Using ALTER TABLE for backwards compatibility
+  const columns = db.prepare("PRAGMA table_info(macro_data)").all();
+  const columnNames = columns.map(c => c.name);
+
+  if (!columnNames.includes('t10y2y')) {
+    console.log('📊 Adding T10Y2Y (yield curve) column to macro_data...');
+    db.exec('ALTER TABLE macro_data ADD COLUMN t10y2y REAL');
+  }
+
+  if (!columnNames.includes('unrate')) {
+    console.log('📊 Adding UNRATE (unemployment) column to macro_data...');
+    db.exec('ALTER TABLE macro_data ADD COLUMN unrate REAL');
+  }
+
+  if (!columnNames.includes('cpiaucsl')) {
+    console.log('📊 Adding CPIAUCSL (inflation) column to macro_data...');
+    db.exec('ALTER TABLE macro_data ADD COLUMN cpiaucsl REAL');
+  }
+
   // API cache table
   db.exec(`
     CREATE TABLE IF NOT EXISTS api_cache (
