@@ -1,103 +1,116 @@
-const fetch = require('node-fetch');
+const openbb = require('./openbb');
 const config = require('../config');
 const { getCached, setCache } = require('./cache');
-
-// Updated to new FMP stable API (free tier)
-const FMP_BASE_URL = 'https://financialmodelingprep.com/stable';
-const API_KEY = config.apiKeys.fmp;
+const providerHealth = require('../utils/providerHealth');
 
 /**
- * Fetch company fundamentals
+ * ⚠️ MIGRATED TO OPENBB PLATFORM
+ *
+ * This module now uses OpenBB Platform for unified API access with provider redundancy.
+ * - Primary: FMP (via OpenBB)
+ * - Fallback: yfinance, intrinio
+ * - Cache layer: PRESERVED (24-hour TTL)
+ * - Health tracking: Automatically prioritizes reliable providers
+ *
+ * OpenBB Platform normalizes percentage fields to decimals (0.08 = 8%)
+ */
+
+/**
+ * Fetch company fundamentals via OpenBB with provider fallback
  * @param {string} ticker
  * @returns {Object} - Parsed fundamentals with flags
  */
 async function getFundamentals(ticker) {
-  // Check cache first
-  const cacheKey = `fmp_fundamentals_${ticker}`;
+  // ✅ PRESERVED: Check cache first
+  const cacheKey = `fundamentals_${ticker}`;
   const cached = getCached(cacheKey);
   if (cached) {
-    console.log(`Cache hit for ${ticker}`);
+    console.log(`✅ Cache hit for ${ticker}`);
     return cached;
   }
 
-  try {
-    console.log(`Fetching fundamentals for ${ticker} from FMP (stable API)...`);
+  console.log(`🔄 Fetching ${ticker} via OpenBB...`);
 
-    // Fetch multiple endpoints in parallel using new stable API format
-    const [profile, quote, keyMetrics, financialGrowth] = await Promise.all([
-      fetchJSON(`${FMP_BASE_URL}/profile?symbol=${ticker}&apikey=${API_KEY}`),
-      fetchJSON(`${FMP_BASE_URL}/quote?symbol=${ticker}&apikey=${API_KEY}`),
-      fetchJSON(`${FMP_BASE_URL}/key-metrics-ttm?symbol=${ticker}&apikey=${API_KEY}`),
-      fetchJSON(`${FMP_BASE_URL}/financial-growth?symbol=${ticker}&apikey=${API_KEY}&limit=1`)
-    ]);
+  // ✅ NEW: Dynamic provider ordering based on health scores
+  const baseProviders = ['yfinance', 'fmp', 'intrinio'];
+  const providers = providerHealth.sortProvidersByHealth(baseProviders);
 
-    // Parse data from new API format
-    const companyName = profile[0]?.companyName || ticker;
-    const sector = profile[0]?.sector || null;
-    const latestPrice = quote[0]?.price || null;
+  console.log(`📊 Provider priority: ${providers.join(' → ')}`);
 
-    // Calculate P/E from earnings yield (P/E = 1 / earnings yield)
-    const earningsYield = keyMetrics[0]?.earningsYieldTTM || null;
-    const peForward = earningsYield && earningsYield > 0 ? (1 / earningsYield) : null;
+  for (const provider of providers) {
+    try {
+      const data = await openbb.getFundamentals(ticker, provider);
 
-    // Growth metrics - convert from decimal to percentage
-    const revenueGrowth = financialGrowth[0]?.revenueGrowth
-      ? financialGrowth[0].revenueGrowth * 100
-      : null;
-    const epsGrowth = financialGrowth[0]?.epsgrowth
-      ? financialGrowth[0].epsgrowth * 100
-      : null;
+      // Normalize data to match existing schema
+      const result = normalizeFundamentals(data, ticker);
 
-    // Debt metrics from key metrics TTM
-    const netDebt = keyMetrics[0]?.netDebtToEBITDATTM || null;
-    const debtEbitda = netDebt !== null && netDebt < 0 ? 0 : netDebt;
+      // ✅ NEW: Record successful fetch
+      providerHealth.recordSuccess(provider);
 
-    // Flags
-    const epsPositive = earningsYield && earningsYield > 0;
-    const ebitdaPositive = keyMetrics[0]?.evToEBITDATTM ? true : true; // Assume true if EBITDA ratio exists
-    const peAvailable = peForward !== null && peForward > 0;
+      // ✅ PRESERVED: Cache for 24 hours
+      setCache(cacheKey, result, config.cacheTTL);
 
-    const result = {
-      ticker,
-      companyName,
-      sector,
-      revenueGrowth,
-      epsGrowth,
-      peForward,
-      debtEbitda,
-      epsPositive,
-      ebitdaPositive,
-      peAvailable,
-      latestPrice,
-      priceTimestamp: new Date().toISOString()
-    };
+      console.log(`✅ ${ticker} fetched successfully from ${provider}`);
+      return result;
 
-    // Cache for 24 hours
-    setCache(cacheKey, result, config.cacheTTL);
+    } catch (error) {
+      // ✅ NEW: Record failure with error details
+      providerHealth.recordFailure(provider, error.message);
 
-    return result;
-  } catch (error) {
-    console.error(`FMP API error for ${ticker}:`, error.message);
-    throw new Error(`Failed to fetch fundamentals for ${ticker}: ${error.message}`);
+      console.warn(`⚠️ ${provider} failed for ${ticker}: ${error.message}`);
+      // Try next provider
+    }
   }
+
+  throw new Error(`Failed to fetch ${ticker} from all providers (${providers.join(', ')})`);
 }
 
-async function fetchJSON(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    // Get response body for more details
-    const text = await response.text();
+/**
+ * ⚠️ IMPORTANT: OpenBB Platform Data Normalization
+ *
+ * OpenBB Platform v4.5.0+ normalizes ALL providers to return
+ * growth metrics as decimals (0.08 = 8% growth), regardless of source.
+ *
+ * The format detection code below is defensive programming for edge cases.
+ */
+function normalizeFundamentals(openbbData, ticker) {
+  /**
+   * Detect if growth rates are decimals or percentages
+   * Heuristic: If value is between -1.5 and 1.5, it's likely a decimal (e.g., 0.08 = 8%)
+   * If > 1.5, it's already a percentage (e.g., 8.0 = 8%)
+   */
+  const isDecimalFormat = (value) => {
+    return value !== null && value !== undefined && Math.abs(value) < 1.5;
+  };
 
-    // Check for premium/subscription errors (HTTP 402)
-    if (response.status === 402) {
-      throw new Error(`This stock requires a premium FMP subscription. The free tier doesn't include detailed data for this ticker. Consider upgrading at https://financialmodelingprep.com/pricing or try a different stock.`);
-    }
+  // Convert decimals to percentages for compatibility with existing classification system
+  const convertToPercentage = (value) => {
+    if (value === null || value === undefined) return null;
+    return isDecimalFormat(value) ? value * 100 : value;
+  };
 
-    // Include response body in error if available
-    const errorDetail = text ? ` - ${text.substring(0, 200)}` : '';
-    throw new Error(`HTTP ${response.status}: ${response.statusText}${errorDetail}`);
-  }
-  return response.json();
+  // Handle negative debt (net cash position)
+  const debtEbitda = openbbData.debt_to_ebitda !== null && openbbData.debt_to_ebitda < 0
+    ? 0
+    : openbbData.debt_to_ebitda;
+
+  // Transform OpenBB data format to match existing schema
+  return {
+    ticker,
+    companyName: openbbData.company_name || ticker,
+    sector: openbbData.sector,
+    // ✅ Smart conversion: only multiply by 100 if format is decimal
+    revenueGrowth: convertToPercentage(openbbData.revenue_growth),
+    epsGrowth: convertToPercentage(openbbData.eps_growth),
+    peForward: openbbData.pe_forward,
+    debtEbitda: debtEbitda,
+    // Flags for classification
+    epsPositive: openbbData.eps !== null && openbbData.eps > 0,
+    ebitdaPositive: openbbData.ebitda !== null && openbbData.ebitda > 0,
+    peAvailable: openbbData.pe_forward !== null && openbbData.pe_forward > 0,
+    latestPrice: openbbData.price,
+    priceTimestamp: openbbData.timestamp || new Date().toISOString()
+  };
 }
 
 module.exports = { getFundamentals };
