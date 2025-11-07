@@ -3,12 +3,14 @@ const config = require('../config');
 
 /**
  * Calculate class scores for a stock
- * @param {Object} fundamentals - { revenueGrowth, epsGrowth, peForward, debtEbitda, flags }
+ * @param {Object} fundamentals - { revenueGrowth, epsGrowth, peForward, debtEbitda, eps, ebitda, flags }
  * @returns {Object} - { scores: { A, B, C, D }, finalClass, confidence }
  */
 function classifyStock(fundamentals) {
   const { revenueGrowth, epsGrowth, peForward, debtEbitda } = fundamentals;
   const { epsPositive, ebitdaPositive, peAvailable } = fundamentals;
+  // ✅ NEW: Access raw eps and ebitda values to check for actual negative earnings
+  const { eps, ebitda } = fundamentals;
 
   const targets = config.classTargets;
 
@@ -45,12 +47,16 @@ function classifyStock(fundamentals) {
   // --- Class D Score (with gate logic) ---
   let D = 0;
 
-  // D gate triggers
+  // ✅ FIXED: D gate triggers for hypergrowth or pre-profit companies
+  // Only trigger if:
+  // 1. Hypergrowth (revenue >= 50%), OR
+  // 2. Actually losing money (eps or ebitda is NEGATIVE), OR
+  // 3. Missing ALL earnings indicators (no P/E AND no EPS growth)
   const dGateTrigger =
     (revenueGrowth !== null && revenueGrowth >= targets.D.revenueGrowthThreshold) ||
-    !epsPositive ||
-    !ebitdaPositive ||
-    !peAvailable;
+    (eps !== null && eps !== undefined && eps < 0) ||
+    (ebitda !== null && ebitda !== undefined && ebitda < 0) ||
+    (!peAvailable && epsGrowth === null);
 
   if (dGateTrigger) {
     D = 1.0;

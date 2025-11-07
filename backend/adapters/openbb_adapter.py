@@ -102,7 +102,9 @@ def get_fundamentals(ticker, provider='fmp'):
             'debt_to_ebitda': convert_to_native_types(latest_row.get('debt_to_ebitda', latest_row.get('net_debt_to_ebitda'))),
             'eps': convert_to_native_types(latest_row.get('eps', latest_row.get('earnings_per_share'))),
             'ebitda': convert_to_native_types(latest_row.get('ebitda')),
-            'price': convert_to_native_types(latest_row.get('price', latest_row.get('last_price'))),
+            # ⚠️ Price should come from get_quote() endpoint, not fundamentals
+            # The obb.equity.fundamental.metrics() endpoint does NOT include price data
+            'price': None,
             'market_cap': convert_to_native_types(latest_row.get('market_cap')),
             'timestamp': datetime.now().isoformat()
         }
@@ -190,11 +192,12 @@ def get_quote(ticker, provider='fmp'):
 
         latest = df.iloc[-1]
 
+        # ✅ Convert all values to native Python types for JSON serialization
         return {
             'ticker': ticker,
-            'price': latest.get('price') or latest.get('last_price'),
-            'volume': latest.get('volume'),
-            'timestamp': latest.get('timestamp') or datetime.now().isoformat()
+            'price': convert_to_native_types(latest.get('price') or latest.get('last_price')),
+            'volume': convert_to_native_types(latest.get('volume')),
+            'timestamp': str(latest.get('timestamp')) if latest.get('timestamp') else datetime.now().isoformat()
         }
 
     except Exception as e:
