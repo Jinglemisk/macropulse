@@ -3,6 +3,11 @@
 > **Complete Reference for Migrating Portfolio App to OpenBB Platform**
 >
 > This guide covers the migration from direct API calls (FMP, FRED) to OpenBB unified API while preserving caching, classification logic, and UI.
+>
+> **Document Version:** 1.1
+> **Last Updated:** November 3, 2025
+> **OpenBB Platform Version:** v4.5.0
+> **Verification Status:** ✅ Verified against official OpenBB Platform v4.5.0 documentation
 
 ---
 
@@ -104,7 +109,7 @@ obb.equity.fundamental.metrics('AAPL', provider='yfinance')
 - Future-proof expansion
 
 **4. Expanded Macro Data**
-- 816,000+ FRED series available
+- 841,000+ FRED series available
 - CPI, GDP, unemployment, yields
 - International economic data
 - Alternative datasets
@@ -424,7 +429,7 @@ All metrics accessible via OpenBB's `obb.economy.*` and `obb.fixedincome.*` modu
 
 | Provider | Available Series | Access via OpenBB |
 |----------|------------------|-------------------|
-| **FRED** | 816,000+ US economic time series | `obb.economy.fred_series(symbol='...')` |
+| **FRED** | 841,000+ US economic time series | `obb.economy.fred_series(symbol='...')` |
 | **EconDB** | 100+ standardized global indicators | `obb.economy.*` with country parameters |
 | **IMF** | 2,600+ international time series | `obb.economy.*` |
 | **OECD** | Developed country data | `obb.economy.*` |
@@ -435,7 +440,73 @@ All metrics accessible via OpenBB's `obb.economy.*` and `obb.fixedincome.*` modu
 
 ---
 
+## Provider Field Mapping Reference
+
+### Critical: Field Name Differences Across Providers
+
+Different providers return data with different field names. The Python adapter must handle these variations.
+
+#### Equity Fundamentals Field Mapping
+
+| Our Field | FMP | yfinance | Intrinio | Notes |
+|-----------|-----|----------|----------|-------|
+| `company_name` | `name` | `longName` | `name` | Primary field varies |
+| `revenue_growth` | `revenueGrowth` | `revenueGrowth` | `revenue_growth` | All support, naming varies |
+| `eps_growth` | `epsGrowth` | `earningsGrowth` | `earnings_growth` | Field name differs significantly |
+| `pe_forward` | `forwardPE` | `forwardPE` | `forward_pe` | Consistent naming |
+| `debt_to_ebitda` | `debtToEbitda` | ❌ Not available | `net_debt_to_ebitda` | yfinance doesn't provide |
+| `market_cap` | `marketCap` | `marketCap` | `market_cap` | All support |
+| `sector` | `sector` | `sector` | `sector` | Consistent |
+| `price` | `price` | `regularMarketPrice` | `close` | Different field names |
+
+**Key Insights**:
+- ✅ All providers return `revenue_growth` and `eps_growth` (different names)
+- ⚠️ yfinance lacks `debt_to_ebitda` ratio
+- ⚠️ Field names use different conventions (camelCase vs snake_case)
+- ✅ Fallback logic required: `row.get('name') or row.get('longName') or row.get('company_name')`
+
+#### Data Format Differences
+
+**✅ UPDATE (OpenBB Platform v4.5.0):** OpenBB Platform **normalizes ALL providers** to return percentage fields as decimals (0.08 = 8%). This table shows the _original_ source formats, but OpenBB standardizes them for you:
+
+| Metric | Original Source Format | OpenBB Normalized Format |
+|--------|------------------------|--------------------------|
+| **Growth Rates** | Varies by provider | **Always Decimal** (0.08 = 8%) |
+| **P/E Ratios** | Float (25.3) | Float (25.3) |
+| **Market Cap** | Float (varies: billions or dollars) | Provider-dependent |
+
+**Note**: The format detection code in this guide is defensive programming and provides safety for edge cases, but OpenBB should handle normalization automatically.
+
+---
+
 ## Technical Implementation
+
+### OpenBB Platform Version Requirements
+
+**Required Version**: OpenBB Platform **v4.0.0 or higher**
+
+**Important**: This guide is for **OpenBB Platform** (v4.x+), NOT the legacy OpenBB Terminal (v3.x). The APIs are completely different.
+
+#### Installation
+
+```bash
+# Install OpenBB Platform with version constraint
+pip install "openbb>=4.0.0,<5.0.0"
+
+# Verify installation
+python3 -c "import openbb; print(f'OpenBB Platform v{openbb.__version__}')"
+
+# Expected output: OpenBB Platform v4.x.x
+```
+
+#### Why Version Matters
+
+- **v4.x (Platform)**: Modern API with `obb.equity.*`, `obb.economy.*` - Used in this guide ✅
+- **v3.x (Terminal)**: Legacy CLI with different API structure - NOT compatible ❌
+
+If you see `ModuleNotFoundError` or API errors, verify you have Platform v4.x installed.
+
+---
 
 ### Phase 1: OpenBB Setup & Python Environment
 
@@ -444,8 +515,16 @@ All metrics accessible via OpenBB's `obb.economy.*` and `obb.fixedincome.*` modu
 **Check Python version:**
 ```bash
 python3 --version
-# Need Python 3.10, 3.11, 3.12, or 3.13
+# Recommended: Python 3.10, 3.11, or 3.12
+# Python 3.13 supported (requires OpenBB Platform v4.5.0+)
+# Python 3.9 DEPRECATED - support ends Fall 2025
 ```
+
+**Python Version Recommendations:**
+- ✅ **Recommended:** Python 3.10, 3.11, or 3.12 (best compatibility)
+- ✅ **Latest:** Python 3.13 (supported in OpenBB v4.5.0+)
+- ⚠️ **Deprecated:** Python 3.9 (will be removed in Fall 2025)
+- ❌ **Not Supported:** Python 3.8 and earlier
 
 **Install Python (if needed):**
 - macOS: `brew install python@3.11`
@@ -459,16 +538,45 @@ python3 --version
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install OpenBB
+# Install OpenBB Platform (latest v4.5.0)
 pip install openbb
 
-# Verify installation
-python3 -c "from openbb import obb; print('OpenBB installed successfully')"
+# Verify installation and version
+python3 -c "import openbb; print(f'OpenBB Platform v{openbb.__version__}')"
+# Expected output: OpenBB Platform v4.5.0 (or higher)
 ```
+
+**Note:** This guide is verified for OpenBB Platform v4.5.0. Earlier v4.x versions should work but may have minor differences.
 
 #### 1.3 Configure API Keys
 
-**Option 1: Local Configuration File**
+**⭐ RECOMMENDED: Option 2 - Environment Variables**
+
+For child-process architecture, environment variables are the **safest and most reliable** approach:
+
+**Why Environment Variables?**
+- ✅ Works across processes (Node.js can pass to Python)
+- ✅ No file system dependencies
+- ✅ Portable across environments (dev, prod)
+- ✅ Easy to manage in deployment
+- ✅ Automatically loaded by OpenBB
+
+Add to your project's `.env` file:
+```bash
+# OpenBB API Keys (automatically detected by OpenBB Platform)
+OPENBB_FMP_API_KEY=your_fmp_api_key_here
+OPENBB_FRED_API_KEY=your_fred_api_key_here
+
+# Optional: Specify Python path if using virtual environment
+PYTHON_PATH=python3
+# Or for venv: PYTHON_PATH=/absolute/path/to/venv/bin/python
+```
+
+**How it works**: OpenBB Platform automatically reads environment variables prefixed with `OPENBB_`. No additional configuration needed in Python code.
+
+---
+
+**Alternative: Option 1 - Local Configuration File**
 
 ```bash
 # OpenBB stores credentials in ~/.openbb_platform/user_settings.json
@@ -488,15 +596,11 @@ obb.user.credentials.fred_api_key = "your_fred_api_key_here"
 obb.account.save()
 ```
 
-**Option 2: Environment Variables**
+**Drawback**: Requires manual setup, user-specific file path.
 
-Add to `.env`:
-```bash
-OBB_FMP_API_KEY=your_fmp_api_key_here
-OBB_FRED_API_KEY=your_fred_api_key_here
-```
+---
 
-**Option 3: OpenBB Hub (Cloud Sync)**
+**Alternative: Option 3 - OpenBB Hub (Cloud Sync)**
 
 1. Create account at https://my.openbb.co
 2. Get Personal Access Token (PAT)
@@ -504,6 +608,8 @@ OBB_FRED_API_KEY=your_fred_api_key_here
 ```python
 obb.account.login(pat='your_pat_token')
 ```
+
+**Drawback**: Requires internet connection, external dependency.
 
 #### 1.4 Test OpenBB Installation
 
@@ -670,14 +776,39 @@ async function getFundamentals(ticker) {
   throw new Error(`Failed to fetch ${ticker} from all providers`);
 }
 
+/**
+ * ⚠️ IMPORTANT: OpenBB Platform Data Normalization
+ *
+ * As of OpenBB Platform v4.5.0, ALL providers are normalized to return
+ * growth metrics as decimals (0.08 = 8% growth), regardless of source.
+ *
+ * Quote from OpenBB docs: "OpenBB Platform standardizes percentage fields
+ * to always return them as normalized decimal values - meaning 1% is
+ * represented as 0.01"
+ *
+ * The format detection code below is defensive programming and may not be
+ * strictly necessary, but provides safety for edge cases or older versions.
+ */
 function normalizeFundamentals(openbbData, ticker) {
+  // Detect if growth rates are decimals or percentages
+  // Heuristic: If revenue_growth is between -1 and 1, it's likely a decimal
+  // Note: This is defensive - OpenBB should already normalize to decimals
+  const isDecimalFormat = (value) => {
+    return value !== null && Math.abs(value) < 1.5;
+  };
+
   // Transform OpenBB data format to match your existing schema
   return {
     ticker,
     companyName: openbbData.company_name || openbbData.name,
     sector: openbbData.sector,
-    revenueGrowth: openbbData.revenue_growth * 100, // Convert decimal to percentage
-    epsGrowth: openbbData.eps_growth * 100,
+    // Smart conversion: only multiply by 100 if format is decimal
+    revenueGrowth: isDecimalFormat(openbbData.revenue_growth)
+      ? openbbData.revenue_growth * 100
+      : openbbData.revenue_growth,
+    epsGrowth: isDecimalFormat(openbbData.eps_growth)
+      ? openbbData.eps_growth * 100
+      : openbbData.eps_growth,
     peForward: openbbData.pe_forward || openbbData.forward_pe,
     debtEbitda: openbbData.debt_to_ebitda || 0,
     epsPositive: openbbData.eps_positive || (openbbData.eps > 0),
@@ -1123,29 +1254,31 @@ def get_fundamentals(ticker, provider='fmp'):
             provider=provider
         )
 
-        # Convert to dict
-        data = result.to_dict('records')
+        # ✅ FIXED: Properly access OBBject results via DataFrame
+        df = result.to_df()
 
-        if not data:
+        if df.empty:
             raise ValueError(f"No data returned for {ticker}")
 
-        # Get most recent record
-        latest = data[0] if isinstance(data, list) else data
+        # Get most recent record (last row)
+        latest_row = df.iloc[-1]
 
-        # Normalize field names
+        # Normalize field names with proper DataFrame column access
+        # Use .get() for safe access to avoid KeyError
         normalized = {
             'ticker': ticker,
             'provider': provider,
-            'company_name': latest.get('company_name') or latest.get('name'),
-            'sector': latest.get('sector'),
-            'revenue_growth': latest.get('revenue_growth'),
-            'eps_growth': latest.get('eps_growth') or latest.get('earnings_growth'),
-            'pe_forward': latest.get('pe_forward') or latest.get('forward_pe'),
-            'debt_to_ebitda': latest.get('debt_to_ebitda') or latest.get('net_debt_to_ebitda'),
-            'eps': latest.get('eps') or latest.get('earnings_per_share'),
-            'ebitda': latest.get('ebitda'),
-            'price': latest.get('price') or latest.get('last_price'),
-            'market_cap': latest.get('market_cap'),
+            # Note: 'name' is primary field, 'company_name' is fallback
+            'company_name': latest_row.get('name', latest_row.get('company_name', ticker)),
+            'sector': latest_row.get('sector'),
+            'revenue_growth': latest_row.get('revenue_growth'),
+            'eps_growth': latest_row.get('eps_growth', latest_row.get('earnings_growth')),
+            'pe_forward': latest_row.get('pe_forward', latest_row.get('forward_pe')),
+            'debt_to_ebitda': latest_row.get('debt_to_ebitda', latest_row.get('net_debt_to_ebitda')),
+            'eps': latest_row.get('eps', latest_row.get('earnings_per_share')),
+            'ebitda': latest_row.get('ebitda'),
+            'price': latest_row.get('price', latest_row.get('last_price')),
+            'market_cap': latest_row.get('market_cap'),
             'timestamp': datetime.now().isoformat()
         }
 
@@ -1181,15 +1314,25 @@ def get_fred_series(series_id, start_date=None, end_date=None):
             provider='fred'
         )
 
-        # Convert to list of dicts
+        # Convert to DataFrame
         df = result.to_df()
 
+        # ✅ FIXED: FRED returns data with series_id as column name, not 'value'
         # Convert DataFrame to records
         records = []
         for idx, row in df.iterrows():
+            # Try to get value using series_id as column name first
+            if series_id in row:
+                value = row[series_id]
+            elif 'value' in row:
+                value = row['value']
+            else:
+                # Fallback to first column
+                value = row.iloc[0]
+
             records.append({
                 'date': idx.strftime('%Y-%m-%d') if hasattr(idx, 'strftime') else str(idx),
-                'value': float(row['value']) if 'value' in row else float(row.iloc[0]),
+                'value': float(value),
                 'series_id': series_id
             })
 
@@ -1361,7 +1504,9 @@ async function executePythonScript(args) {
       [PYTHON_SCRIPT, ...args],
       {
         timeout: TIMEOUT_MS,
-        maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large responses
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large responses
+        env: process.env  // Pass environment variables to Python (includes OPENBB_* keys)
+        // Note: env inherits from parent by default, but explicit is clearer
       }
     );
 
@@ -1513,8 +1658,8 @@ Add to `.env`:
 
 ```bash
 # OpenBB Configuration
-OBB_FMP_API_KEY=your_fmp_api_key_here
-OBB_FRED_API_KEY=your_fred_api_key_here
+OPENBB_FMP_API_KEY=your_fmp_api_key_here
+OPENBB_FRED_API_KEY=your_fred_api_key_here
 
 # Python Configuration
 PYTHON_PATH=python3
@@ -1982,13 +2127,14 @@ pip install openbb
 
 **Solution**:
 ```python
-# Configure in Python
+# Configure in Python (for current session only)
 from openbb import obb
 obb.user.credentials.fmp_api_key = "your_key"
-obb.account.save()
+# Note: obb.account.save() is DEPRECATED in v4.5.0 and will be removed
+# Use environment variables or config file instead
 
-# Or set in .env
-OBB_FMP_API_KEY=your_key
+# Or set in .env (RECOMMENDED)
+OPENBB_FMP_API_KEY=your_key
 ```
 
 #### 4. Timeout Errors
@@ -2259,7 +2405,7 @@ This migration guide provides everything needed to integrate OpenBB into your po
 ✅ **Option 2 (Child-Process Bridge)** is optimal for your use case
 ✅ **Cache layer preserved** - most important advantage maintained
 ✅ **Provider redundancy** - automatic fallback improves reliability
-✅ **Expanded data** - access to 816,000+ economic series
+✅ **Expanded data** - access to 841,000+ economic series
 ✅ **Future-proof** - easy to add new providers and indicators
 ✅ **Minimal disruption** - frontend and classification unchanged
 
