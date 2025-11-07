@@ -5,9 +5,10 @@ const db = require('../database');
  * @returns {Object} - { regime, description, recommendation, metrics }
  */
 function calculateRegime() {
-  // 1. Get latest data
+  // 1. Get latest data (with valid WALCL - published weekly by FRED)
   const latestMacro = db.prepare(`
     SELECT * FROM macro_data
+    WHERE walcl IS NOT NULL
     ORDER BY date DESC
     LIMIT 1
   `).get();
@@ -24,7 +25,7 @@ function calculateRegime() {
 
   const walcl12WeeksAgo = db.prepare(`
     SELECT walcl FROM macro_data
-    WHERE date <= ?
+    WHERE date <= ? AND walcl IS NOT NULL
     ORDER BY date DESC
     LIMIT 1
   `).get(date12WeeksAgo)?.walcl;
