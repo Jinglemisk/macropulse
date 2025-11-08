@@ -1,4 +1,4 @@
-# Investment Portfolio Dashboard
+# Investment Strategy Interface
 
 > **⚠️ Personal Hobby Project Disclaimer**
 >

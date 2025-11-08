@@ -477,6 +477,152 @@ This captures "profitable hypergrowth" companies that have:
 
 ---
 
+## Enhanced Regime System (FPS/GPS) 🆕
+
+> **⚠️ IMPLEMENTATION IN PROGRESS**
+>
+> See [FPS_GPS_IMPLEMENTATION.md](./FPS_GPS_IMPLEMENTATION.md) for complete specification.
+
+### Overview
+
+The **Enhanced Regime System** extends the basic 2×2 regime with two powerful overlay scores:
+
+1. **Fed Pressure Score (FPS)**: Weighted composite of 10 macro indicators predicting Fed policy direction 3-6 months ahead
+2. **Growth Pulse Score (GPS)**: Separate measure of economic growth strength independent of inflation
+
+**What This Adds:**
+- **13 macro indicators** (up from 2): Unemployment, Jobless Claims, Nonfarm Payrolls, CPI, Core CPI, PPI, ISM PMIs, Consumer Confidence
+- **Dynamic allocation tilting**: Base allocation shifts based on FPS (Fed pressure) and GPS (growth context)
+- **Enhanced UI**: Score gauges, indicator grid, allocation chart, interpretation panel
+- **Forward-looking signals**: FPS provides 3-6 month policy bias, improving regime predictiveness
+
+**What Stays the Same:**
+- Stock classification (A/B/C/D classes and scoring logic)
+- Basic regime framework (Rates × Balance Sheet 2×2 matrix)
+- Stock table, filtering, and notes functionality
+
+### Core Concepts
+
+#### Fed Pressure Score (FPS)
+
+**Range:** -1.0 (maximum dovish) to +1.0 (maximum hawkish)
+
+**Formula:**
+```javascript
+FPS = Σ(weight_i × score_i) / Σ(weight_i)
+where score_i ∈ {-1, 0, +1} for each indicator
+```
+
+**Interpretation:**
+- **FPS > +0.5**: Strong contractionary pressure → Fed likely to hike/QT → Future liquidity tighter
+- **FPS near 0**: Neutral → Fed on hold
+- **FPS < -0.5**: Strong expansionary pressure → Fed likely to cut/QE → Future liquidity looser
+
+**Use Case:** Tilts allocation along A→D ladder based on forward policy direction
+
+#### Growth Pulse Score (GPS)
+
+**Range:** -1.0 (recession) to +1.0 (strong growth)
+
+**Formula:** Same as FPS but excludes inflation metrics (CPI, Core CPI, PPI)
+
+**Interpretation:**
+- **GPS > +0.3**: Strong growth → Tie-breaker favors Class C (growthier) in In-Between regimes
+- **GPS < -0.3**: Weak growth → Tie-breaker favors Class B (more defensive)
+
+**Use Case:** Resolves B vs C ambiguity when FPS is neutral (|FPS| < 0.2)
+
+### Indicator Table (13 Total)
+
+| Indicator | FRED ID | FPS Weight | GPS Weight | High Threshold | Low Threshold |
+|-----------|---------|------------|------------|----------------|---------------|
+| **Unemployment Rate** | UNRATE | 1.5 | 1.5 | >5.5% | <4.0% |
+| **Jobless Claims** | ICSA | 1.0 | 1.0 | >350k | <250k |
+| **Nonfarm Payrolls** | PAYEMS | 1.5 | 2.0 | >250k | <50k |
+| **CPI (YoY)** | CPIAUCSL | 1.5 | - | >3.0% | <2.0% |
+| **Core CPI (YoY)** | CPILFESL | 2.0 | - | >3.0% | <2.0% |
+| **PPI (MoM)** | PPIACO | 1.0 | - | >0.2% | <0% |
+| **ISM Mfg PMI** | NAPMPI | 1.0 | 1.5 | >55 | <50 |
+| **ISM Services** | NAPMSI | 1.0 | 1.5 | >55 | <50 |
+| **Chicago PMI** | TBD | 0.5 | 0.5 | >55 | <50 |
+| **Consumer Confidence** | UMCSENT | 0.5 | 1.0 | >120 | <100 |
+
+**Supporting Indicators** (used for base regime only):
+- **Fed Balance Sheet** (WALCL)
+- **Fed Funds Rate** (DFF)
+- **10Y-2Y Spread** (T10Y2Y) - warning flag for inverted curve
+
+**Total Weights:** FPS = 11.5, GPS = 9.5
+
+### Allocation Mechanism
+
+**Base Allocation** (from regime):
+```javascript
+{
+  'Most Liquid':          { A:10, B:20, C:30, D:40 },
+  'In Between (Low+Shr)': { A:15, B:25, C:40, D:20 },
+  'In Between (High+Grow)': { A:15, B:40, C:30, D:15 },
+  'Least Liquid':         { A:60, B:30, C:10, D:0 }
+}
+```
+
+**FPS Tilt** (k=0.25):
+```
+Tilt% = FPS × 25%
+
+If FPS > 0 (contractionary):
+  Shift Tilt% from D→C→B→A (defensive shift)
+
+If FPS < 0 (expansionary):
+  Shift |Tilt%| from A→B→C→D (growth shift)
+```
+
+**GPS Tie-Break** (only if |FPS| < 0.2 AND regime is In-Between):
+```
+If GPS > +0.3: Shift 5-10% toward C (growthier)
+If GPS < -0.3: Shift 5-10% toward B (more defensive)
+```
+
+**Example:**
+```
+Regime: Most Liquid
+Base: A:10, B:20, C:30, D:40
+
+FPS = +0.6 (hawkish pressure)
+Tilt% = 0.6 × 25% = 15%
+
+Apply defensive tilt:
+Take 15% from D, distribute to A/B/C
+Result: A:17.5, B:24.5, C:33, D:25
+
+Interpretation: "Still Most Liquid, but shift 15% defensive due to Fed tightening pressure"
+```
+
+### Enhanced Frontend Components
+
+**New Components:**
+- `ScoreGauge.jsx` - Visual gauge for FPS/GPS (-1 to +1 range)
+- `IndicatorGrid.jsx` - Table showing all 13 indicators with spot + MA values
+- `AllocationChart.jsx` - Horizontal bar chart showing A/B/C/D allocation
+- `InterpretationPanel.jsx` - Generated messages explaining regime + scores
+
+**Enhanced:**
+- `RegimeDisplay.jsx` - Now includes FPS/GPS gauges, indicator grid, allocation chart
+
+### Implementation Status
+
+- [x] Documentation complete ([FPS_GPS_IMPLEMENTATION.md](./FPS_GPS_IMPLEMENTATION.md))
+- [ ] Database schema migration (8 new columns + 2 new tables)
+- [ ] Backend modules (indicatorClassifier, scoreCalculator, enhancedRegimeCalculator, allocationEngine)
+- [ ] FRED data fetching expanded to 13 series
+- [ ] API endpoint enhancements
+- [ ] Frontend components (5 new, 1 enhanced)
+- [ ] Testing and validation
+
+**Estimated Implementation Time:** 16-20 hours
+
+---
+
 ## Frontend Components
 
 ### Project Structure
