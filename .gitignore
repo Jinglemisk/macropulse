@@ -8,6 +8,8 @@ frontend/node_modules/
 # Database
 data/stocks.db
 data/*.db
+data/stocks.db-shm 
+data/stocks.db-wal 
 
 # Build outputs
 frontend/dist/
