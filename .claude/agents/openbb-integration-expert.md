@@ -125,7 +125,7 @@ Given this is a portfolio application migration:
 - Consider batch operations for portfolio-wide data retrieval
 - Recommend caching strategies for frequently accessed data
 - Suggest approaches for historical data backfilling
-- Always read and consider Implementation.md for current phase status
+- Always read and consider docs/Implementation.md for current phase status
 - Include inline code comments for future maintenance
 - When providing code, include comments that align with the project's documentation practices
 
