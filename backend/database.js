@@ -85,6 +85,64 @@ function initializeTables() {
     db.exec('ALTER TABLE macro_data ADD COLUMN cpiaucsl REAL');
   }
 
+  // ✅ FPS/GPS Enhancement: Add 8 new macro indicator columns
+  if (!columnNames.includes('jobless_claims')) {
+    console.log('📊 Adding jobless_claims (ICSA) column to macro_data...');
+    db.exec('ALTER TABLE macro_data ADD COLUMN jobless_claims REAL');
+  }
+
+  if (!columnNames.includes('nonfarm_payrolls')) {
+    console.log('📊 Adding nonfarm_payrolls (PAYEMS) column to macro_data...');
+    db.exec('ALTER TABLE macro_data ADD COLUMN nonfarm_payrolls REAL');
+  }
+
+  if (!columnNames.includes('core_cpi')) {
+    console.log('📊 Adding core_cpi (CPILFESL) column to macro_data...');
+    db.exec('ALTER TABLE macro_data ADD COLUMN core_cpi REAL');
+  }
+
+  if (!columnNames.includes('ppi')) {
+    console.log('📊 Adding ppi (PPIACO) column to macro_data...');
+    db.exec('ALTER TABLE macro_data ADD COLUMN ppi REAL');
+  }
+
+  if (!columnNames.includes('ism_manufacturing')) {
+    console.log('📊 Adding ism_manufacturing (NAPMPI) column to macro_data...');
+    db.exec('ALTER TABLE macro_data ADD COLUMN ism_manufacturing REAL');
+  }
+
+  if (!columnNames.includes('ism_services')) {
+    console.log('📊 Adding ism_services (NAPMSI) column to macro_data...');
+    db.exec('ALTER TABLE macro_data ADD COLUMN ism_services REAL');
+  }
+
+  if (!columnNames.includes('chicago_pmi')) {
+    console.log('📊 Adding chicago_pmi column to macro_data...');
+    db.exec('ALTER TABLE macro_data ADD COLUMN chicago_pmi REAL');
+  }
+
+  if (!columnNames.includes('consumer_confidence')) {
+    console.log('📊 Adding consumer_confidence (UMCSENT) column to macro_data...');
+    db.exec('ALTER TABLE macro_data ADD COLUMN consumer_confidence REAL');
+  }
+
+  // ✅ FPS/GPS Enhancement: Add moving average columns for all 10 indicators
+  if (!columnNames.includes('unrate_ma3')) {
+    console.log('📊 Adding moving average columns for FPS/GPS calculations...');
+    db.exec(`
+      ALTER TABLE macro_data ADD COLUMN unrate_ma3 REAL;
+      ALTER TABLE macro_data ADD COLUMN jobless_claims_ma3 REAL;
+      ALTER TABLE macro_data ADD COLUMN nonfarm_payrolls_ma3 REAL;
+      ALTER TABLE macro_data ADD COLUMN cpi_yoy_ma3 REAL;
+      ALTER TABLE macro_data ADD COLUMN core_cpi_yoy_ma3 REAL;
+      ALTER TABLE macro_data ADD COLUMN ppi_ma3 REAL;
+      ALTER TABLE macro_data ADD COLUMN ism_manufacturing_ma3 REAL;
+      ALTER TABLE macro_data ADD COLUMN ism_services_ma3 REAL;
+      ALTER TABLE macro_data ADD COLUMN chicago_pmi_ma3 REAL;
+      ALTER TABLE macro_data ADD COLUMN consumer_confidence_ma3 REAL;
+    `);
+  }
+
   // API cache table
   db.exec(`
     CREATE TABLE IF NOT EXISTS api_cache (
@@ -92,6 +150,34 @@ function initializeTables() {
       response_data TEXT NOT NULL,
       cached_at TEXT NOT NULL,
       expires_at TEXT NOT NULL
+    )
+  `);
+
+  // ✅ FPS/GPS Enhancement: Regime history table for tracking scores over time
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS regime_history (
+      date TEXT PRIMARY KEY,
+      regime TEXT NOT NULL,
+      regime_confidence REAL NOT NULL,
+
+      -- Scores
+      fps REAL NOT NULL,
+      gps REAL NOT NULL,
+      fps_confidence REAL,
+      overall_confidence REAL NOT NULL,
+
+      -- Allocation
+      allocation_a REAL NOT NULL,
+      allocation_b REAL NOT NULL,
+      allocation_c REAL NOT NULL,
+      allocation_d REAL NOT NULL,
+
+      -- Metadata (JSON)
+      fps_breakdown TEXT,
+      gps_breakdown TEXT,
+      warnings TEXT,
+
+      recorded_at TEXT NOT NULL
     )
   `);
 
@@ -111,7 +197,12 @@ function initializeTables() {
     ON api_cache(expires_at)
   `);
 
-  console.log('Database tables initialized');
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_regime_history_date
+    ON regime_history(date DESC)
+  `);
+
+  console.log('✅ Database tables initialized (FPS/GPS enhanced schema)');
 }
 
 // Initialize tables on module load
