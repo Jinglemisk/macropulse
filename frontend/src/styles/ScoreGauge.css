@@ -1,0 +1,115 @@
+/* ✅ FPS/GPS Enhancement: Score Gauge Styles */
+
+.score-gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background-color: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  min-width: 250px;
+}
+
+.gauge-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.gauge-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0e0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gauge-value {
+  font-size: 24px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+.gauge-bar-container {
+  margin: 12px 0;
+}
+
+.gauge-bar-bg {
+  position: relative;
+  height: 24px;
+  background: linear-gradient(to right,
+    #059669 0%,
+    #10b981 25%,
+    #64748b 50%,
+    #f97316 75%,
+    #ef4444 100%
+  );
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #3a3a3a;
+}
+
+.gauge-zero-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: rgba(255, 255, 255, 0.5);
+  z-index: 2;
+}
+
+.gauge-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  transition: width 0.3s ease;
+  z-index: 1;
+}
+
+.gauge-marker {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 4px;
+  transform: translateX(-2px);
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+  z-index: 3;
+  transition: left 0.3s ease;
+}
+
+.gauge-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.scale-label {
+  font-size: 11px;
+  color: #a0a0a0;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+.gauge-interpretation {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 8px;
+  padding: 6px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .score-gauge {
+    min-width: 200px;
+  }
+
+  .gauge-value {
+    font-size: 20px;
+  }
+}
