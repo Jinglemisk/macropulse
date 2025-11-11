@@ -18,9 +18,9 @@ const MA_WINDOWS = {
   cpi_yoy: 9,             // 9 months - calculated from cpiaucsl
   core_cpi_yoy: 9,        // 9 months - calculated from core_cpi
   ppi: 12,                // 12 months - high volatility
-  ism_manufacturing: 9,   // 9 months
-  ism_services: 9,        // 9 months
-  chicago_pmi: 9,         // 9 months (placeholder)
+  cfnai: 6,               // 6 months - composite index (replaces ISM Mfg)
+  indpro: 9,              // 9 months - industrial production (replaces Chicago PMI)
+  retail_sales: 9,        // 9 months - retail sales (replaces ISM Services)
   consumer_confidence: 12 // 12 months - high volatility
 };
 
@@ -94,7 +94,7 @@ async function updateMovingAverages() {
     const allData = db.prepare(`
       SELECT date, unrate, jobless_claims, nonfarm_payrolls,
              cpiaucsl, core_cpi, ppi,
-             ism_manufacturing, ism_services, chicago_pmi, consumer_confidence
+             cfnai, indpro, retail_sales, consumer_confidence
       FROM macro_data
       ORDER BY date DESC
     `).all();
@@ -134,14 +134,19 @@ async function updateMovingAverages() {
       MA_WINDOWS.ppi
     );
 
-    const maIsmMfg = calculateMA(
-      allData.map(d => ({ date: d.date, value: d.ism_manufacturing })),
-      MA_WINDOWS.ism_manufacturing
+    const maCfnai = calculateMA(
+      allData.map(d => ({ date: d.date, value: d.cfnai })),
+      MA_WINDOWS.cfnai
     );
 
-    const maIsmSvc = calculateMA(
-      allData.map(d => ({ date: d.date, value: d.ism_services })),
-      MA_WINDOWS.ism_services
+    const maIndpro = calculateMA(
+      allData.map(d => ({ date: d.date, value: d.indpro })),
+      MA_WINDOWS.indpro
+    );
+
+    const maRetail = calculateMA(
+      allData.map(d => ({ date: d.date, value: d.retail_sales })),
+      MA_WINDOWS.retail_sales
     );
 
     const maConsCon = calculateMA(
@@ -158,8 +163,9 @@ async function updateMovingAverages() {
           cpi_yoy_ma3 = ?,
           core_cpi_yoy_ma3 = ?,
           ppi_ma3 = ?,
-          ism_manufacturing_ma3 = ?,
-          ism_services_ma3 = ?,
+          cfnai_ma3 = ?,
+          indpro_ma3 = ?,
+          retail_sales_ma3 = ?,
           consumer_confidence_ma3 = ?
       WHERE date = ?
     `);
@@ -173,8 +179,9 @@ async function updateMovingAverages() {
         maCpiYoY.get(row.date) || null,
         maCoreCpiYoY.get(row.date) || null,
         maPpi.get(row.date) || null,
-        maIsmMfg.get(row.date) || null,
-        maIsmSvc.get(row.date) || null,
+        maCfnai.get(row.date) || null,
+        maIndpro.get(row.date) || null,
+        maRetail.get(row.date) || null,
         maConsCon.get(row.date) || null,
         row.date
       );
@@ -183,7 +190,8 @@ async function updateMovingAverages() {
 
     console.log(`✅ Updated moving averages for ${updatedCount} data points`);
     console.log(`  Window sizes: UNRATE=${MA_WINDOWS.unrate}mo, ICSA=${MA_WINDOWS.jobless_claims}mo, PAYEMS=${MA_WINDOWS.nonfarm_payrolls}mo`);
-    console.log(`                CPI/CoreCPI=${MA_WINDOWS.cpi_yoy}mo, PPI=${MA_WINDOWS.ppi}mo, ISM=${MA_WINDOWS.ism_manufacturing}mo`);
+    console.log(`                CPI/CoreCPI=${MA_WINDOWS.cpi_yoy}mo, PPI=${MA_WINDOWS.ppi}mo`);
+    console.log(`                CFNAI=${MA_WINDOWS.cfnai}mo, INDPRO=${MA_WINDOWS.indpro}mo, Retail=${MA_WINDOWS.retail_sales}mo`);
     console.log(`                ConsCon=${MA_WINDOWS.consumer_confidence}mo`);
 
   } catch (error) {

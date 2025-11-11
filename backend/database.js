@@ -126,7 +126,17 @@ function initializeTables() {
     db.exec('ALTER TABLE macro_data ADD COLUMN consumer_confidence REAL');
   }
 
-  // ✅ FPS/GPS Enhancement: Add moving average columns for all 10 indicators
+  // ✅ FPS/GPS Enhancement: Add alternative FRED indicators (replacing ISM PMI)
+  if (!columnNames.includes('cfnai')) {
+    console.log('📊 Adding alternative FRED indicators (CFNAI, INDPRO, RETAILSMNS)...');
+    db.exec(`
+      ALTER TABLE macro_data ADD COLUMN cfnai REAL;
+      ALTER TABLE macro_data ADD COLUMN indpro REAL;
+      ALTER TABLE macro_data ADD COLUMN retail_sales REAL;
+    `);
+  }
+
+  // ✅ FPS/GPS Enhancement: Add moving average columns for all indicators
   if (!columnNames.includes('unrate_ma3')) {
     console.log('📊 Adding moving average columns for FPS/GPS calculations...');
     db.exec(`
@@ -136,9 +146,9 @@ function initializeTables() {
       ALTER TABLE macro_data ADD COLUMN cpi_yoy_ma3 REAL;
       ALTER TABLE macro_data ADD COLUMN core_cpi_yoy_ma3 REAL;
       ALTER TABLE macro_data ADD COLUMN ppi_ma3 REAL;
-      ALTER TABLE macro_data ADD COLUMN ism_manufacturing_ma3 REAL;
-      ALTER TABLE macro_data ADD COLUMN ism_services_ma3 REAL;
-      ALTER TABLE macro_data ADD COLUMN chicago_pmi_ma3 REAL;
+      ALTER TABLE macro_data ADD COLUMN cfnai_ma3 REAL;
+      ALTER TABLE macro_data ADD COLUMN indpro_ma3 REAL;
+      ALTER TABLE macro_data ADD COLUMN retail_sales_ma3 REAL;
       ALTER TABLE macro_data ADD COLUMN consumer_confidence_ma3 REAL;
     `);
   }

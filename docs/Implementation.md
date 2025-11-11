@@ -623,7 +623,7 @@ Interpretation: "Still Most Liquid, but shift 15% defensive due to Fed tightenin
 - [x] Frontend components (5 new: ScoreGauge, IndicatorGrid, AllocationChart, InterpretationPanel + enhanced RegimeDisplay)
 - [x] Testing and validation (backend tested successfully)
 
-*Note: ISM Manufacturing (NAPMPI) and ISM Services (NAPMSI) data returned 0 results from FRED, likely due to proprietary restrictions. Chicago PMI is not available via FRED.*
+*Note: ISM Manufacturing (NAPMPI) and ISM Services (NAPMSI) proprietary data removed from FRED after 2016. Chicago PMI (TBD) not available via FRED. Retail sales series code is RSXFS (not RETAILSMNS - which doesn't exist in OpenBB/FRED).*
 
 **Actual Implementation Time:** ~4 hours
 
