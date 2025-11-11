@@ -2203,6 +2203,52 @@ function normalizeFundamentals(openbbData, ticker) {
 }
 ```
 
+#### 8. FRED Series Not Found (e.g., RETAILSMNS)
+
+**Error**: `Failed to fetch FRED series RETAILSMNS: Results not found.`
+
+**Cause**: The series code doesn't exist in FRED or isn't available via OpenBB Platform.
+
+**Common Series Issues**:
+- `RETAILSMNS` - DOES NOT EXIST - Use `RSXFS` (Retail and Food Services Sales) instead
+- `NAPMPI` / `NAPMSI` - Proprietary ISM PMI data - Not available in FRED since 2016
+- `CHICAGO_PMI` - Not in FRED - Use alternative economic activity measures (CFNAI, INDPRO)
+
+**Solution - Test FRED Series Availability**:
+
+```bash
+# Using the OpenBB adapter
+export OPENBB_FRED_API_KEY="your_fred_api_key"
+python3 backend/adapters/openbb_adapter.py fred_series RSXFS
+
+# If you get data back, the series is available
+# If you get "Results not found", try an alternative series
+```
+
+**Recommended Retail Sales Alternatives**:
+
+| Series ID | Description | Data Frequency | Units | Use Case |
+|-----------|-------------|-----------------|-------|----------|
+| **RSXFS** | Retail and Food Services Sales | Monthly | Millions $ | General retail sales trends (✅ RECOMMENDED) |
+| RRSXFS | Retail Sales YoY % Change | Monthly | % | Growth rate comparison |
+| DRSFS | Retail Sales MoM % Change | Monthly | % | Momentum indicator |
+| RSXFSXMRSL | Retail Sales ex Autos (SA) | Monthly | Millions $ | Core retail (excludes volatile auto sales) |
+
+**Verification**:
+```bash
+# Verify RSXFS works:
+$ python3 backend/adapters/openbb_adapter.py fred_series RSXFS
+[
+  {
+    "date": "2024-11-01",
+    "value": 616833.0,
+    "series_id": "RSXFS"
+  },
+  ...
+]
+# ✅ Success!
+```
+
 #### 8. Classification Scores Changed
 
 **Symptom**: Stocks classify differently after migration
@@ -2362,9 +2408,10 @@ obb.economy.events(provider='fmp')
 | | T10Y2Y | 10Y-2Y Spread |
 | **Money** | M2SL | M2 Money Supply |
 | | M1SL | M1 Money Supply |
-| **Consumer** | RETAILSMNS | Retail Sales |
+| **Consumer** | RSXFS | Retail and Food Services Sales (✅ Use this instead of RETAILSMNS) |
+| | RRSXFS | Retail Sales YoY % Change |
 | | UMCSENT | Consumer Sentiment |
-| **Manufacturing** | NAPMPI | ISM Manufacturing PMI |
+| **Manufacturing** | NAPMPI | ISM Manufacturing PMI (⚠️ Not available - proprietary) |
 | **Housing** | HOUST | Housing Starts |
 | | MORTGAGE30US | 30-Year Mortgage Rate |
 | **Credit** | BAMLC0A4CBBB | BBB Corporate Spread |

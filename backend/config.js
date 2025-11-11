@@ -58,9 +58,10 @@ module.exports = {
       cpi_yoy: 1.5,
       core_cpi_yoy: 2.0,
       ppi: 1.0,
-      ism_manufacturing: 1.0,
-      ism_services: 1.0,
-      chicago_pmi: 0.5,
+      // ✅ Economic Activity Indicators (replacing proprietary ISM PMI data)
+      cfnai: 1.0,           // Chicago Fed National Activity Index (replaces ISM Mfg)
+      indpro: 0.5,          // Industrial Production Index
+      retail_sales: 1.0,    // Retail Sales (RSXFS - replaces ISM Services)
       consumer_confidence: 0.5
     },
     tiltMagnitude: 0.25  // k parameter (25% max shift)
@@ -72,9 +73,9 @@ module.exports = {
       jobless_claims: 1.0,
       nonfarm_payrolls: 2.0,
       // Note: CPI, Core CPI, PPI not used in GPS
-      ism_manufacturing: 1.5,
-      ism_services: 1.5,
-      chicago_pmi: 0.5,
+      cfnai: 1.5,           // Higher weight in GPS (composite economic indicator)
+      indpro: 0.5,
+      retail_sales: 1.5,    // Higher weight in GPS (growth proxy via RSXFS)
       consumer_confidence: 1.0
     },
     tieBreakThreshold: 0.2,  // |FPS| threshold for GPS to activate
@@ -89,9 +90,10 @@ module.exports = {
     cpi_yoy: { low: 2.0, high: 3.0 },
     core_cpi_yoy: { low: 2.0, high: 3.0 },
     ppi: { low: 0, high: 0.2 },
-    ism_manufacturing: { low: 50, high: 55 },
-    ism_services: { low: 50, high: 55 },
-    chicago_pmi: { low: 50, high: 55 },
+    // ✅ Economic Activity Indicator Thresholds (FRED RSXFS, CFNAI, INDPRO)
+    cfnai: { low: -0.7, high: 0.35 },          // Chicago Fed National Activity Index
+    indpro: { low: 0, high: 0.2 },             // Industrial Production (MoM % change)
+    retail_sales: { low: 0, high: 0.4 },       // Retail Sales (RSXFS - from FRED, not seasonally adjusted)
     consumer_confidence: { low: 100, high: 120 }
   },
 

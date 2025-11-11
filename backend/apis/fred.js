@@ -16,7 +16,7 @@ const { updateMovingAverages } = require('../utils/movingAverages');
  * Fetch and store expanded FRED macro data via OpenBB
  * @param {number} days - Number of days to fetch (default 365)
  *
- * ✅ FPS/GPS Enhancement: Expanded to 13 FRED series:
+ * ✅ FPS/GPS Enhancement: Expanded to 15 FRED series:
  * - WALCL: Fed Balance Sheet
  * - DFF: Fed Funds Rate
  * - T10Y2Y: 10-Year minus 2-Year Treasury Yield Spread
@@ -26,23 +26,25 @@ const { updateMovingAverages } = require('../utils/movingAverages');
  * - PAYEMS: Nonfarm Payrolls (Total Employees)
  * - CPILFESL: Core CPI (Less Food & Energy)
  * - PPIACO: Producer Price Index (All Commodities)
- * - NAPMPI: ISM Manufacturing PMI
- * - NAPMSI: ISM Services PMI
+ * - CFNAI: Chicago Fed National Activity Index (replaces ISM Mfg PMI)
+ * - INDPRO: Industrial Production Index (replaces Chicago PMI)
+ * - RSXFS: Retail and Food Services Sales (CORRECTED - RETAILSMNS doesn't exist in FRED via OpenBB)
  * - UMCSENT: University of Michigan Consumer Sentiment
- * - Note: Chicago PMI not available via FRED (proprietary data)
+ * - Note: ISM PMI (NAPMPI/NAPMSI) proprietary - not available via FRED after 2016
  */
 async function updateMacroData(days = 365) {
   const endDate = new Date().toISOString().split('T')[0];
   const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
   try {
-    console.log(`📊 Fetching 13 FRED series for FPS/GPS from ${startDate} to ${endDate} via OpenBB...`);
+    console.log(`📊 Fetching 15 FRED series for FPS/GPS from ${startDate} to ${endDate} via OpenBB...`);
 
-    // ✅ FPS/GPS: Fetch all 12 available series in parallel (Chicago PMI not available)
+    // ✅ FPS/GPS: Fetch all 12 available series in parallel
+    // Note: NAPMPI & NAPMSI (ISM PMI) removed from FRED in 2016
     const [
       walclData, dffData, yieldCurveData, unrateData, cpiData,
       joblessData, payrollsData, coreCpiData, ppiData,
-      ismMfgData, ismSvcData, consConfData
+      cfnaiData, indproData, retailData, consConfData
     ] = await Promise.all([
       openbb.getFredSeries('WALCL', startDate, endDate),
       openbb.getFredSeries('DFF', startDate, endDate),
@@ -53,8 +55,9 @@ async function updateMacroData(days = 365) {
       openbb.getFredSeries('PAYEMS', startDate, endDate),
       openbb.getFredSeries('CPILFESL', startDate, endDate),
       openbb.getFredSeries('PPIACO', startDate, endDate),
-      openbb.getFredSeries('NAPMPI', startDate, endDate).catch(() => []),  // Graceful fallback
-      openbb.getFredSeries('NAPMSI', startDate, endDate).catch(() => []),  // Graceful fallback
+      openbb.getFredSeries('CFNAI', startDate, endDate),       // Chicago Fed Activity Index
+      openbb.getFredSeries('INDPRO', startDate, endDate),      // Industrial Production
+      openbb.getFredSeries('RSXFS', startDate, endDate),       // Retail and Food Services Sales (CORRECTED from RETAILSMNS)
       openbb.getFredSeries('UMCSENT', startDate, endDate)
     ]);
 
@@ -62,7 +65,7 @@ async function updateMacroData(days = 365) {
     console.log(`  Core: WALCL=${walclData.length}, DFF=${dffData.length}, T10Y2Y=${yieldCurveData.length}`);
     console.log(`  Labor: UNRATE=${unrateData.length}, ICSA=${joblessData.length}, PAYEMS=${payrollsData.length}`);
     console.log(`  Inflation: CPI=${cpiData.length}, CoreCPI=${coreCpiData.length}, PPI=${ppiData.length}`);
-    console.log(`  Activity: ISM Mfg=${ismMfgData.length}, ISM Svc=${ismSvcData.length}, Cons Conf=${consConfData.length}`);
+    console.log(`  Activity: CFNAI=${cfnaiData.length}, INDPRO=${indproData.length}, Retail=${retailData.length}, ConsSent=${consConfData.length}`);
 
     // Merge all series by date
     const dateMap = new Map();
@@ -85,16 +88,17 @@ async function updateMacroData(days = 365) {
     addToMap(payrollsData, 'nonfarm_payrolls');
     addToMap(coreCpiData, 'core_cpi');
     addToMap(ppiData, 'ppi');
-    addToMap(ismMfgData, 'ism_manufacturing');
-    addToMap(ismSvcData, 'ism_services');
+    addToMap(cfnaiData, 'cfnai');
+    addToMap(indproData, 'indpro');
+    addToMap(retailData, 'retail_sales');
     addToMap(consConfData, 'consumer_confidence');
 
-    // ✅ FPS/GPS: Insert all 12 series (chicago_pmi left NULL)
+    // ✅ FPS/GPS: Insert all 12 series + 3 alternatives
     const insertStmt = db.prepare(`
       INSERT OR REPLACE INTO macro_data (
         date, walcl, dff, t10y2y, unrate, cpiaucsl,
         jobless_claims, nonfarm_payrolls, core_cpi, ppi,
-        ism_manufacturing, ism_services, chicago_pmi, consumer_confidence,
+        cfnai, indpro, retail_sales, consumer_confidence,
         fetched_at
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -117,9 +121,9 @@ async function updateMacroData(days = 365) {
           values.nonfarm_payrolls || null,
           values.core_cpi || null,
           values.ppi || null,
-          values.ism_manufacturing || null,
-          values.ism_services || null,
-          null,  // chicago_pmi - not available via FRED
+          values.cfnai || null,
+          values.indpro || null,
+          values.retail_sales || null,
           values.consumer_confidence || null,
           now
         );
@@ -127,7 +131,7 @@ async function updateMacroData(days = 365) {
       }
     }
 
-    console.log(`✅ Updated ${count} days of FPS/GPS macro data (12 series)`);
+    console.log(`✅ Updated ${count} days of FPS/GPS macro data (12 series + 3 alternatives)`);
 
     // ✅ FPS/GPS: Calculate moving averages after data insertion
     await updateMovingAverages();

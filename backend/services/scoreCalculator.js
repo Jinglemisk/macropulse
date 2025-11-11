@@ -20,9 +20,10 @@ const WEIGHTS = {
     cpi_yoy: 1.5,
     core_cpi_yoy: 2.0,
     ppi: 1.0,
-    ism_manufacturing: 1.0,
-    ism_services: 1.0,
-    chicago_pmi: 0.5,
+    // ✅ Alternative FRED indicators (replacing ISM PMI)
+    cfnai: 1.0,           // Chicago Fed Activity Index (replaces ISM Mfg)
+    indpro: 0.5,          // Industrial Production (replaces Chicago PMI)
+    retail_sales: 1.0,    // Retail Sales (replaces ISM Services)
     consumer_confidence: 0.5
   },
   gps: {
@@ -30,9 +31,9 @@ const WEIGHTS = {
     jobless_claims: 1.0,
     nonfarm_payrolls: 2.0,
     // CPI, Core CPI, PPI not used in GPS
-    ism_manufacturing: 1.5,
-    ism_services: 1.5,
-    chicago_pmi: 0.5,
+    cfnai: 1.5,           // Higher weight in GPS (composite economic indicator)
+    indpro: 0.5,
+    retail_sales: 1.5,    // Higher weight in GPS (growth proxy)
     consumer_confidence: 1.0
   }
 };
