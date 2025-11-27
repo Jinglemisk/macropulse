@@ -1,4 +1,4 @@
-# Macro Compass
+# Macro Pulse
 
 > **⚠️ Disclaimer**
 >
