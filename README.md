@@ -1,83 +1,109 @@
-# Investment Strategy Interface
+# Macro Compass
 
-> **⚠️ Personal Hobby Project Disclaimer**
+> **⚠️ Disclaimer**
 >
-> This is a personal hobby project I built to help me think about my own investment decisions. It's not production-ready, has no authentication, minimal error handling, and absolutely should not be used as professional investment advice. I'm sharing it publicly in case someone finds the approach interesting or wants to build something similar. Use at your own risk!
+> This application is provided for informational and educational purposes only. It is not investment advice and should not be relied upon for making investment decisions. The classifications and regime indicators are based on historical patterns and do not guarantee future results. Users are responsible for conducting their own research and due diligence.
 
-A Bloomberg Terminal-inspired dashboard I built for tracking stocks across different macro regimes. The whole thing runs locally on my machine - no cloud, no subscriptions, just me, my data, and SQLite.
+Macro Compass is a locally-hosted financial analysis dashboard that classifies stocks by fundamental characteristics and analyzes portfolio allocation across different macroeconomic regimes. The application combines traditional fundamental analysis with regime-based positioning using Federal Reserve policy indicators.
 
-The core idea is simple: classify stocks into four groups (A/B/C/D) based on their fundamentals, then adjust strategy based on what the Fed is doing. Think of it as a framework for thinking about portfolio allocation rather than a get-rich-quick scheme.
+The system operates on two core principles: (1) stocks can be classified into four distinct categories based on growth rates, valuation metrics, and debt levels, and (2) optimal allocation shifts with changes in monetary policy conditions.
 
-## What It Does
+## Features
 
-I got tired of juggling spreadsheets and wanted something more visual. This dashboard:
+The dashboard provides:
 
-- **Auto-classifies stocks** into 4 buckets based on growth rates, P/E ratios, and debt levels
-- **Tracks macro regime** using Fed balance sheet and interest rates to figure out which asset class might do better
-- **Shows confidence scores** because sometimes a stock doesn't fit neatly into one category
-- **Lets me take notes** in markdown (because future-me always forgets why I bought something)
-- **Stores everything locally** in SQLite - I like knowing where my data lives
-- **Pulls fresh data** from multiple sources via OpenBB Platform (with automatic fallbacks when APIs fail)
+- **Automated Stock Classification** - Categorizes equities into four classes (A/B/C/D) using triangular closeness functions applied to revenue growth, EPS growth, forward P/E, and debt/EBITDA ratios
+- **Enhanced Regime Analysis** - Calculates macro regime using Fed balance sheet, interest rates, and 13 economic indicators including unemployment, CPI, retail sales, and consumer confidence
+- **Fed Pressure Score (FPS)** - Weighted composite score measuring Federal Reserve policy pressure across 10 macroeconomic indicators, providing 3-6 month forward policy signals
+- **Growth Pulse Score (GPS)** - Economic growth assessment independent of inflation metrics, used for allocation tie-breaking in ambiguous regimes
+- **Dynamic Allocation Engine** - Automatically adjusts recommended portfolio allocation based on regime classification and FPS/GPS overlay signals
+- **Confidence Scoring** - Quantifies classification certainty for both individual stocks and overall regime assessment
+- **Local SQLite Storage** - All data persisted locally with historical tracking for classifications and regime shifts
+- **Multi-Provider Data Integration** - Unified data access via OpenBB Platform with automatic failover across yfinance, Financial Modeling Prep, and Intrinio
 
-### The Classification System
+## Classification System
 
-This is my attempt to bucket stocks by their fundamental characteristics:
+Stocks are categorized into four classes based on fundamental metrics:
 
-**Class A (Blue)** - The Boring Stalwarts
-- Slow growth (~5%), low P/E (~10), minimal debt
-- Think utilities, mature consumer staples
-- These tend to hold up when liquidity dries up
+**Class A (Blue) - Value/Defensive**
+- Target characteristics: ~5% revenue growth, ~10x forward P/E, minimal debt
+- Typical holdings: Utilities, mature consumer staples, established dividend payers
+- Performance profile: Relative outperformance in high-rate, low-liquidity environments
 
-**Class B (Green)** - The Steady Growers
-- Moderate growth (~10%), reasonable P/E (~20)
-- Your typical S&P 500 blue chips
-- Balance between growth and stability
+**Class B (Green) - Quality Growth**
+- Target characteristics: ~10% revenue growth, ~20x forward P/E, moderate leverage
+- Typical holdings: Large-cap technology, diversified industrials, healthcare
+- Performance profile: Balanced risk/reward across multiple regimes
 
-**Class C (Orange)** - The Growth Stories
-- Higher growth (~20%), elevated P/E (~25)
-- Tech companies, fast-growing consumer brands
-- More sensitive to interest rate moves
+**Class C (Orange) - Growth**
+- Target characteristics: ~20% revenue growth, ~25x forward P/E, elevated valuation
+- Typical holdings: High-growth technology, emerging consumer brands
+- Performance profile: Rate-sensitive with strong performance in accommodative policy environments
 
-**Class D (Purple)** - The Hypergrowth Bets
-- Very high growth (>50%) or pre-profit
-- Speculative, high risk/reward
-- First to get crushed when rates rise
+**Class D (Purple) - Hypergrowth/Speculative**
+- Gate triggers: >50% revenue growth OR pre-profit (no positive EPS/EBITDA)
+- Typical holdings: Early-stage companies, unprofitable growth stories
+- Performance profile: Maximum sensitivity to liquidity conditions, extreme volatility
 
-The confidence score tells me how clear-cut the classification is. Low confidence means the stock is somewhere between categories.
+Confidence scores quantify classification certainty. Low confidence indicates the stock exhibits characteristics spanning multiple categories.
 
-### Macro Regimes
+## Regime Framework
 
-The dashboard calculates where we are in the liquidity cycle:
+### Base Regime Calculation
 
-1. **Most Liquid** (Low rates + Balance sheet growing) → Time to overweight Class D
-2. **In Between - Prefer C** (Low rates + Balance sheet shrinking) → Shift toward C/B
-3. **In Between - Prefer B** (High rates + Balance sheet growing) → Favor B/C
-4. **Least Liquid** (High rates + Balance sheet shrinking) → Hide in Class A
+The system determines the macroeconomic regime using a 2×2 matrix based on Federal Reserve policy:
 
-This is a simplified framework based on how different asset types historically performed in different liquidity environments. Your mileage may vary.
+1. **Most Liquid** (Low rates + Balance sheet expansion) → Base allocation: 40% D, 30% C, 20% B, 10% A
+2. **In Between - Prefer C** (Low rates + Balance sheet contraction) → Base allocation: 40% C, 25% B, 20% D, 15% A
+3. **In Between - Prefer B** (High rates + Balance sheet expansion) → Base allocation: 40% B, 30% C, 15% D, 15% A
+4. **Least Liquid** (High rates + Balance sheet contraction) → Base allocation: 60% A, 30% B, 10% C, 0% D
 
-## Tech Stack
+### Enhanced Scoring System
 
-Built this over a few weekends with tools I'm comfortable with:
+The application extends the base regime with two overlay scores:
+
+**Fed Pressure Score (FPS)** - Range: -1.0 (maximum dovish) to +1.0 (maximum hawkish)
+- Aggregates 10 macroeconomic indicators: unemployment, jobless claims, payrolls, CPI, core CPI, PPI, Chicago Fed Activity Index, industrial production, retail sales, consumer confidence
+- Predicts Federal Reserve policy direction 3-6 months forward
+- Positive FPS → Contractionary pressure → Shifts allocation defensively (toward A/B)
+- Negative FPS → Expansionary pressure → Shifts allocation toward growth (toward C/D)
+
+**Growth Pulse Score (GPS)** - Range: -1.0 (recession) to +1.0 (strong growth)
+- Derived from 7 growth indicators (excludes inflation metrics)
+- Activates as tie-breaker when FPS is neutral (|FPS| < 0.2) in In-Between regimes
+- GPS > +0.3 → Favor Class C (growthier)
+- GPS < -0.3 → Favor Class B (more defensive)
+
+The allocation engine applies FPS tilt (k=0.25) to the base allocation, then applies GPS tie-breaking logic to produce final recommended allocations.
+
+## Architecture
 
 **Backend:**
-- Node.js + Express (because JavaScript everywhere)
-- SQLite with better-sqlite3 (fast, local, simple)
-- OpenBB Platform for data (unified API that auto-falls back between providers)
-- Python 3.10+ (required for OpenBB)
+- Node.js + Express (RESTful API server)
+- SQLite with better-sqlite3 (local persistence, ~5ms query latency)
+- OpenBB Platform v4.5.0 (unified financial data gateway)
+- Python 3.10+ (OpenBB adapter bridge)
+- Claude Code subagent for OpenBB integration assistance
 
 **Frontend:**
-- React 18 + Vite (fast refresh is a game-changer)
-- Tailwind CSS (I'm not a designer, utility classes save me)
-- Axios for API calls
+- React 18 with hooks (component-based UI)
+- Vite (build tool and dev server)
+- Tailwind CSS (utility-first styling)
+- Axios (HTTP client with request/response interceptors)
 
-**Data Sources** (via OpenBB):
-- Yahoo Finance (free, unlimited - primary source)
-- Financial Modeling Prep (free tier: 250/day - fallback)
-- FRED (Fed data - free, unlimited)
-- Intrinio (optional - backup)
+**Data Providers** (via OpenBB Platform):
+- **Primary:** yfinance (unlimited, free)
+- **Fallback:** Financial Modeling Prep API (250 requests/day on free tier)
+- **FRED API:** Federal Reserve Economic Data (unlimited)
+- **Optional:** Intrinio (backup provider)
 
-The OpenBB integration is the secret sauce here - automatic provider redundancy means if one API is down, it seamlessly tries the next one.
+**OpenBB Integration Features:**
+- Automatic provider failover with health tracking
+- Unified data schema across providers
+- Node.js ↔ Python bridge for OpenBB Platform access
+- Built-in Claude Code subagent (`openbb-integration-expert`) for deepening OpenBB integration and troubleshooting
+
+The system spawns Python child processes to interface with OpenBB Platform, enabling seamless data access while maintaining the Node.js backend architecture.
 
 ## Getting Started
 
@@ -85,7 +111,7 @@ The OpenBB integration is the secret sauce here - automatic provider redundancy 
 
 - Node.js 18+
 - Python 3.10+ (for OpenBB)
-- Free API keys:
+- Free API keys (for OpenBB endpoints):
   - [Financial Modeling Prep](https://financialmodelingprep.com/) (250 calls/day free)
   - [FRED API](https://fred.stlouisfed.org/docs/api/api_key.html) (unlimited, free)
 
@@ -109,7 +135,7 @@ python3 -c "from openbb import obb; print('✅ OpenBB installed')"
 ```bash
 # Clone the repo
 git clone <your-repo-url>
-cd portfolio-app
+cd macrocompass
 
 # Install backend dependencies
 npm install
@@ -185,39 +211,57 @@ npm run dev
 
 Then open **http://localhost:5173** in your browser.
 
-## How I Use It
+## Usage Workflow
 
-1. **Add a stock** - Type in a ticker (e.g., "NVDA"), hit Add Stock
-2. **Review classification** - See where it falls (A/B/C/D) and check the confidence score
-3. **Check the regime** - Look at current macro regime to see which classes are favored
-4. **Take notes** - Click on a stock row, add notes about why I'm interested
-5. **Refresh periodically** - Update all stocks when I want fresh data (be mindful of API limits)
+1. **Add Stocks** - Enter ticker symbols to add equities to the portfolio
+2. **Review Classifications** - Examine assigned class (A/B/C/D) and confidence scores
+3. **Analyze Regime** - Check current macroeconomic regime, FPS/GPS scores, and recommended allocation
+4. **Document Thesis** - Click stock rows to add markdown-formatted notes and investment rationale
+5. **Refresh Data** - Manually update stock fundamentals and macro indicators (respecting API rate limits)
 
-I typically refresh macro data weekly and stock fundamentals when earnings come out.
+**Recommended refresh schedule:**
+- Macro data: Weekly (13 FRED series)
+- Stock fundamentals: Post-earnings or monthly
+- Intraday prices: Daily (cached for 24 hours)
 
 ## Customization
 
-Want to tweak the classification logic? Edit `backend/config.js`:
+**Classification Parameters** - Modify `backend/config.js`:
 
 ```javascript
 classTargets: {
   A: {
-    revenueGrowth: { center: 5, halfwidth: 5 },  // Adjust these
+    revenueGrowth: { center: 5, halfwidth: 5 },
     epsGrowth: { center: 5, halfwidth: 5 },
-    // ... more parameters
+    peForward: { center: 10, halfwidth: 6 },
+    debtEbitda: { center: 1.0, halfwidth: 1.0 }
   }
+  // Adjust center values and halfwidths for each class
 }
 ```
 
-Colors not your style? Change `frontend/src/config/theme.js`:
+**Theme Configuration** - Modify `frontend/src/config/theme.js`:
 
 ```javascript
 colors: {
   classes: {
-    A: '#3b82f6',  // Make it your own
-    B: '#10b981',
-    C: '#f59e0b',
-    D: '#a855f7'
+    A: '#3b82f6',  // Blue - Value/Defensive
+    B: '#10b981',  // Green - Quality Growth
+    C: '#f59e0b',  // Orange - Growth
+    D: '#a855f7'   // Purple - Hypergrowth
+  }
+}
+```
+
+**FPS/GPS Weights** - Adjust indicator weights in `backend/config.js`:
+
+```javascript
+fps: {
+  weights: {
+    core_cpi_yoy: 2.0,      // Highest weight (inflation critical)
+    unemployment: 1.5,
+    nonfarm_payrolls: 1.5,
+    // ... other indicators
   }
 }
 ```
@@ -225,7 +269,7 @@ colors: {
 ## Project Structure
 
 ```
-portfolio-app/
+macrocompass/
 ├── backend/
 │   ├── server.js              # Express server
 │   ├── database.js            # SQLite setup
@@ -259,49 +303,51 @@ portfolio-app/
 
 ## Troubleshooting
 
-**Database locked errors?**
+**Database Lock Errors**
 ```bash
 rm data/stocks.db
 npm run init-db
 npm run fetch-macro
 ```
 
-**Hit API rate limits?**
-- The app caches responses for 24 hours automatically
-- OpenBB tries yfinance first (unlimited), then falls back to FMP
-- Don't spam the refresh button
+**API Rate Limits**
+- Responses cached automatically for 24 hours
+- OpenBB attempts yfinance (unlimited) before FMP fallback (250/day limit)
+- Avoid excessive manual refresh operations
 
-**Classifications seem wrong?**
-- The triangular closeness function might need tuning for your style
-- Adjust targets in `backend/config.js`
-- Some stocks genuinely don't fit cleanly (check confidence score)
+**Classification Issues**
+- Adjust triangular closeness parameters in `backend/config.js`
+- Review confidence scores - low confidence indicates ambiguous positioning
+- Verify fundamental data completeness via API logs
 
-**No regime data showing up?**
+**Missing Regime Data**
 ```bash
 npm run fetch-macro
 ```
 
+**OpenBB Integration Issues**
+- Utilize built-in Claude Code subagent: `openbb-integration-expert` agent
+- Verify Python environment: `python3 -c "from openbb import obb; print('OK')"`
+- Check provider health tracking in backend logs
+
 ## Documentation
 
-- [Technical Implementation](./docs/Implementation.md) - Database schema, API details, architecture
-- [OpenBB Migration Guide](./docs/OPENBB_MIGRATION_GUIDE.md) - How I migrated to OpenBB Platform
-- [Investment Methodology](./docs/how-to-invest.md) - The thinking behind the classification system
-- [Future Roadmap](./docs/FUTURE_ROADMAP.MD) - Ideas I haven't gotten to yet
+- **[Implementation Guide](./docs/Implementation.md)** - Complete technical specification including database schema, API architecture, classification algorithms, and FPS/GPS calculation logic
+- **[FPS/GPS Enhancement Specification](./docs/FPS_GPS_IMPLEMENTATION.md)** - Detailed documentation of the Fed Pressure Score and Growth Pulse Score system
+- **[OpenBB Migration Guide](./docs/OPENBB_MIGRATION_GUIDE.md)** - OpenBB Platform integration architecture, provider configuration, and troubleshooting
+- **[Investment Methodology](./docs/how-to-invest.md)** - Theoretical framework underlying the classification system and regime analysis
 
-## Disclaimer (Again)
+## Additional Information
 
-I built this for myself to organize my thoughts about investing. It's NOT:
-- Professional financial advice
-- A trading system
-- Production-ready software
-- Guaranteed to be accurate
-- A substitute for doing your own research
+**Limitations:**
+- No authentication system (intended for local/single-user deployment)
+- Limited to daily data refresh cycle (not suitable for intraday trading)
+- Free API tier restrictions apply (FMP: 250 requests/day)
+- Historical backtesting not implemented
+- No real-time alerting or monitoring
 
-Markets are unpredictable. This tool is just a framework for thinking. Do your own due diligence.
-
-## Contributing
-
-This is a personal project, but if you find a bug or have ideas, feel free to open an issue. Pull requests welcome if you want to add features, but no promises on response time.
+**Contributing:**
+Issues and pull requests are welcome. For major changes, please open an issue first to discuss proposed modifications.
 
 ## License
 
@@ -309,13 +355,13 @@ MIT - Do whatever you want with it. See [LICENSE](./LICENSE) for details.
 
 ## Built With
 
-- [OpenBB Platform](https://openbb.co/) - Financial data aggregation
-- [Express](https://expressjs.com/) - Backend framework
-- [React](https://react.dev/) - Frontend framework
-- [Tailwind CSS](https://tailwindcss.com/) - Styling
-- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) - Database
-- [Claude Code](https://claude.com/claude-code) - Development assistance
+- [OpenBB Platform](https://openbb.co/) - Financial data aggregation and provider management
+- [Express.js](https://expressjs.com/) - RESTful API server framework
+- [React](https://react.dev/) - Component-based user interface
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) - High-performance SQLite driver
+- [Claude Code](https://claude.com/claude-code) - Development assistance and integrated OpenBB agent
 
 ---
 
-If you build something cool with this or have questions, feel free to reach out. Happy investing (responsibly)!
+**Macro Compass** - A regime-based portfolio analysis framework for local deployment.
