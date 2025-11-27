@@ -95,9 +95,9 @@ Each of 10 indicators is classified as **High/Normal/Low** based on threshold ba
 | **CPI (YoY)** | >3.0% | 2.0-3.0% | <2.0% | High→+1, Norm→0, Low→-1 | *(Not used)* |
 | **Core CPI (YoY)** | >3.0% | 2.0-3.0% | <2.0% | High→+1, Norm→0, Low→-1 | *(Not used)* |
 | **PPI (MoM)** | >0.2% | 0-0.2% | <0% | High→+1, Norm→0, Low→-1 | *(Not used)* |
-| **ISM Mfg PMI** | >55 | 50-55 | <50 | High→+1, Norm→0, Low→-1 | High→+1, Norm→0, Low→-1 |
-| **ISM Services** | >55 | 50-55 | <50 | High→+1, Norm→0, Low→-1 | High→+1, Norm→0, Low→-1 |
-| **Chicago PMI** | >55 | 50-55 | <50 | High→+1, Norm→0, Low→-1 | High→+1, Norm→0, Low→-1 |
+| **CFNAI** | >0.35 | -0.7 to 0.35 | <-0.7 | High→+1, Norm→0, Low→-1 | High→+1, Norm→0, Low→-1 |
+| **INDPRO (MoM%)** | >0.2% | 0 to 0.2% | <0% | High→+1, Norm→0, Low→-1 | High→+1, Norm→0, Low→-1 |
+| **Retail Sales (MoM%)** | >0.4% | 0 to 0.4% | <0% | High→+1, Norm→0, Low→-1 | High→+1, Norm→0, Low→-1 |
 | **Consumer Confidence** | >120 | 100-120 | <100 | High→+1, Norm→0, Low→-1 | High→+1, Norm→0, Low→-1 |
 
 **Rationale Examples:**
@@ -162,9 +162,9 @@ Result: A:17.5, B:24.5, C:33, D:25
 | 4 | CPI (YoY)* | CPIAUCSL | Monthly | 2wk | >3.0% | 2.0-3.0 | <2.0 | 1.5 | - | 9mo |
 | 5 | Core CPI (YoY)* | CPILFESL | Monthly | 2wk | >3.0% | 2.0-3.0 | <2.0 | 2.0 | - | 9mo |
 | 6 | PPI (MoM)* | PPIACO | Monthly | 2wk | >0.2% | 0-0.2 | <0% | 1.0 | - | 12mo |
-| 7 | ISM Mfg PMI | NAPMPI | Monthly | 1wk | >55 | 50-55 | <50 | 1.0 | 1.5 | 9mo |
-| 8 | ISM Services | NAPMSI | Monthly | 1wk | >55 | 50-55 | <50 | 1.0 | 1.5 | 9mo |
-| 9 | Chicago PMI | (TBD) | Monthly | 1wk | >55 | 50-55 | <50 | 0.5 | 0.5 | 9mo |
+| 7 | CFNAI | CFNAI | Monthly | 1mo | >0.35 | -0.7 to 0.35 | <-0.7 | 1.0 | 1.0 | 6mo |
+| 8 | Industrial Production (MoM%) | INDPRO | Monthly | 1mo | >0.2% | 0 to 0.2% | <0% | 0.5 | 0.5 | 9mo |
+| 9 | Retail Sales (MoM%) | RSXFS | Monthly | 2wk | >0.4% | 0 to 0.4% | <0% | 1.0 | 1.5 | 9mo |
 | 10 | Consumer Confidence | UMCSENT | Monthly | 2wk | >120 | 100-120 | <100 | 0.5 | 1.0 | 12mo |
 
 **Supporting Indicators** (used for regime, not scores):
@@ -179,13 +179,19 @@ Result: A:17.5, B:24.5, C:33, D:25
 - GPS indicators: 7 (total weight: 9.5)
 - Regime indicators: 2 (WALCL, DFF)
 
+**⚠️ Note on Alternative Indicators:**
+ISM PMI data (NAPMPI, NAPMSI) and Chicago PMI are proprietary and not available via FRED after 2016. This implementation uses free alternatives:
+- **CFNAI** (Chicago Fed National Activity Index): Composite of 85 economic indicators, superior proxy for manufacturing activity
+- **INDPRO** (Industrial Production Index): Direct measure of industrial output, broader than regional PMI
+- **RSXFS** (Advance Retail Sales): Strong consumer spending proxy, replaces ISM Services PMI
+
 ---
 
 ### 2.2 Data Frequency & Smoothing
 
-**3-Month Moving Average Windows:**
-- **6 months:** Unemployment (low volatility)
-- **9 months (3 quarters):** CPI, Core CPI, ISM PMIs, Chicago PMI, Nonfarm Payrolls
+**Moving Average Windows:**
+- **6 months:** Unemployment, CFNAI (low volatility indicators)
+- **9 months (3 quarters):** CPI, Core CPI, Industrial Production, Retail Sales, Nonfarm Payrolls
 - **12 months:** Jobless Claims, PPI, Consumer Confidence (high volatility)
 
 **Rationale:** Use MA for classification (stable regime signals), keep spot for trend detection
@@ -208,9 +214,9 @@ const THRESHOLDS = {
   cpi_yoy: { low: 2.0, high: 3.0 },
   core_cpi_yoy: { low: 2.0, high: 3.0 },
   ppi: { low: 0, high: 0.2 },
-  ism_manufacturing: { low: 50, high: 55 },
-  ism_services: { low: 50, high: 55 },
-  chicago_pmi: { low: 50, high: 55 },
+  cfnai: { low: -0.7, high: 0.35 },
+  indpro: { low: 0, high: 0.2 },
+  retail_sales: { low: 0, high: 0.4 },
   consumer_confidence: { low: 100, high: 120 }
 };
 
@@ -231,9 +237,9 @@ const FPS_MAP = {
   cpi_yoy: { High: +1, Normal: 0, Low: -1 },
   core_cpi_yoy: { High: +1, Normal: 0, Low: -1 },
   ppi: { High: +1, Normal: 0, Low: -1 },
-  ism_manufacturing: { High: +1, Normal: 0, Low: -1 },
-  ism_services: { High: +1, Normal: 0, Low: -1 },
-  chicago_pmi: { High: +1, Normal: 0, Low: -1 },
+  cfnai: { High: +1, Normal: 0, Low: -1 },
+  indpro: { High: +1, Normal: 0, Low: -1 },
+  retail_sales: { High: +1, Normal: 0, Low: -1 },
   consumer_confidence: { High: +1, Normal: 0, Low: -1 }
 };
 
@@ -261,18 +267,18 @@ const WEIGHTS = {
     cpi_yoy: 1.5,
     core_cpi_yoy: 2.0,
     ppi: 1.0,
-    ism_manufacturing: 1.0,
-    ism_services: 1.0,
-    chicago_pmi: 0.5,
+    cfnai: 1.0,
+    indpro: 0.5,
+    retail_sales: 1.0,
     consumer_confidence: 0.5
   },
   gps: {
     unemployment: 1.5,
     jobless_claims: 1.0,
     nonfarm_payrolls: 2.0,
-    ism_manufacturing: 1.5,
-    ism_services: 1.5,
-    chicago_pmi: 0.5,
+    cfnai: 1.5,
+    indpro: 0.5,
+    retail_sales: 1.5,
     consumer_confidence: 1.0
   }
 };
@@ -502,9 +508,9 @@ ALTER TABLE macro_data ADD COLUMN jobless_claims REAL;
 ALTER TABLE macro_data ADD COLUMN nonfarm_payrolls REAL;
 ALTER TABLE macro_data ADD COLUMN core_cpi REAL;
 ALTER TABLE macro_data ADD COLUMN ppi REAL;
-ALTER TABLE macro_data ADD COLUMN ism_manufacturing REAL;
-ALTER TABLE macro_data ADD COLUMN ism_services REAL;
-ALTER TABLE macro_data ADD COLUMN chicago_pmi REAL;
+ALTER TABLE macro_data ADD COLUMN cfnai REAL;
+ALTER TABLE macro_data ADD COLUMN indpro REAL;
+ALTER TABLE macro_data ADD COLUMN retail_sales REAL;
 ALTER TABLE macro_data ADD COLUMN consumer_confidence REAL;
 
 -- MA columns
@@ -514,9 +520,9 @@ ALTER TABLE macro_data ADD COLUMN nonfarm_payrolls_ma3 REAL;
 ALTER TABLE macro_data ADD COLUMN cpi_yoy_ma3 REAL;
 ALTER TABLE macro_data ADD COLUMN core_cpi_yoy_ma3 REAL;
 ALTER TABLE macro_data ADD COLUMN ppi_ma3 REAL;
-ALTER TABLE macro_data ADD COLUMN ism_manufacturing_ma3 REAL;
-ALTER TABLE macro_data ADD COLUMN ism_services_ma3 REAL;
-ALTER TABLE macro_data ADD COLUMN chicago_pmi_ma3 REAL;
+ALTER TABLE macro_data ADD COLUMN cfnai_ma3 REAL;
+ALTER TABLE macro_data ADD COLUMN indpro_ma3 REAL;
+ALTER TABLE macro_data ADD COLUMN retail_sales_ma3 REAL;
 ALTER TABLE macro_data ADD COLUMN consumer_confidence_ma3 REAL;
 
 -- Complete schema
@@ -535,9 +541,9 @@ CREATE TABLE macro_data (
   nonfarm_payrolls REAL,
   core_cpi REAL,
   ppi REAL,
-  ism_manufacturing REAL,
-  ism_services REAL,
-  chicago_pmi REAL,
+  cfnai REAL,
+  indpro REAL,
+  retail_sales REAL,
   consumer_confidence REAL,
 
   -- Moving averages
@@ -547,9 +553,9 @@ CREATE TABLE macro_data (
   cpi_yoy_ma3 REAL,
   core_cpi_yoy_ma3 REAL,
   ppi_ma3 REAL,
-  ism_manufacturing_ma3 REAL,
-  ism_services_ma3 REAL,
-  chicago_pmi_ma3 REAL,
+  cfnai_ma3 REAL,
+  indpro_ma3 REAL,
+  retail_sales_ma3 REAL,
   consumer_confidence_ma3 REAL,
 
   fetched_at TEXT
@@ -631,7 +637,7 @@ async function updateMacroData(days = 365) {
   const [
     walclData, dffData, t10y2yData, unreateData, cpiData,
     joblessData, payrollsData, coreCpiData, ppiData,
-    ismMfgData, ismSvcData, consConfData
+    cfnaiData, indproData, retailData, consConfData
   ] = await Promise.all([
     openbb.getFredSeries('WALCL', startDate, endDate),
     openbb.getFredSeries('DFF', startDate, endDate),
@@ -642,8 +648,9 @@ async function updateMacroData(days = 365) {
     openbb.getFredSeries('PAYEMS', startDate, endDate),
     openbb.getFredSeries('CPILFESL', startDate, endDate),
     openbb.getFredSeries('PPIACO', startDate, endDate),
-    openbb.getFredSeries('NAPMPI', startDate, endDate),
-    openbb.getFredSeries('NAPMSI', startDate, endDate),
+    openbb.getFredSeries('CFNAI', startDate, endDate),      // Chicago Fed Activity Index (replaces ISM Mfg)
+    openbb.getFredSeries('INDPRO', startDate, endDate),     // Industrial Production (replaces Chicago PMI)
+    openbb.getFredSeries('RSXFS', startDate, endDate),      // Retail Sales (replaces ISM Services)
     openbb.getFredSeries('UMCSENT', startDate, endDate)
   ]);
 
@@ -884,9 +891,9 @@ module.exports = {
       cpi_yoy: 1.5,
       core_cpi_yoy: 2.0,
       ppi: 1.0,
-      ism_manufacturing: 1.0,
-      ism_services: 1.0,
-      chicago_pmi: 0.5,
+      cfnai: 1.0,
+      indpro: 0.5,
+      retail_sales: 1.0,
       consumer_confidence: 0.5
     },
     tiltMagnitude: 0.25  // k parameter
@@ -897,9 +904,9 @@ module.exports = {
       unemployment: 1.5,
       jobless_claims: 1.0,
       nonfarm_payrolls: 2.0,
-      ism_manufacturing: 1.5,
-      ism_services: 1.5,
-      chicago_pmi: 0.5,
+      cfnai: 1.5,
+      indpro: 0.5,
+      retail_sales: 1.5,
       consumer_confidence: 1.0
     },
     tieBreakThreshold: 0.2,  // |FPS| threshold for GPS to activate
@@ -914,9 +921,9 @@ module.exports = {
     cpi_yoy: { low: 2.0, high: 3.0 },
     core_cpi_yoy: { low: 2.0, high: 3.0 },
     ppi: { low: 0, high: 0.2 },
-    ism_manufacturing: { low: 50, high: 55 },
-    ism_services: { low: 50, high: 55 },
-    chicago_pmi: { low: 50, high: 55 },
+    cfnai: { low: -0.7, high: 0.35 },
+    indpro: { low: 0, high: 0.2 },
+    retail_sales: { low: 0, high: 0.4 },
     consumer_confidence: { low: 100, high: 120 }
   },
 
