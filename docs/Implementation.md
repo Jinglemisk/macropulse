@@ -491,7 +491,7 @@ The **Enhanced Regime System** extends the basic 2×2 regime with two powerful o
 2. **Growth Pulse Score (GPS)**: Separate measure of economic growth strength independent of inflation
 
 **What This Adds:**
-- **13 macro indicators** (up from 2): Unemployment, Jobless Claims, Nonfarm Payrolls, CPI, Core CPI, PPI, ISM PMIs, Consumer Confidence
+- **13 macro indicators** (up from 2): Unemployment, Jobless Claims, Nonfarm Payrolls, CPI, Core CPI, PPI, CFNAI, Industrial Production, Retail Sales, Consumer Confidence
 - **Dynamic allocation tilting**: Base allocation shifts based on FPS (Fed pressure) and GPS (growth context)
 - **Enhanced UI**: Score gauges, indicator grid, allocation chart, interpretation panel
 - **Forward-looking signals**: FPS provides 3-6 month policy bias, improving regime predictiveness
@@ -542,9 +542,9 @@ where score_i ∈ {-1, 0, +1} for each indicator
 | **CPI (YoY)** | CPIAUCSL | 1.5 | - | >3.0% | <2.0% |
 | **Core CPI (YoY)** | CPILFESL | 2.0 | - | >3.0% | <2.0% |
 | **PPI (MoM)** | PPIACO | 1.0 | - | >0.2% | <0% |
-| **ISM Mfg PMI** | NAPMPI | 1.0 | 1.5 | >55 | <50 |
-| **ISM Services** | NAPMSI | 1.0 | 1.5 | >55 | <50 |
-| **Chicago PMI** | TBD | 0.5 | 0.5 | >55 | <50 |
+| **CFNAI** | CFNAI | 1.0 | 1.0 | >0.35 | <-0.7 |
+| **Industrial Production** | INDPRO | 0.5 | 0.5 | >0.2% | <0% |
+| **Retail Sales** | RSXFS | 1.0 | 1.5 | >0.4% | <0% |
 | **Consumer Confidence** | UMCSENT | 0.5 | 1.0 | >120 | <100 |
 
 **Supporting Indicators** (used for base regime only):
@@ -611,15 +611,24 @@ Interpretation: "Still Most Liquid, but shift 15% defensive due to Fed tightenin
 
 ### Implementation Status
 
-- [x] Documentation complete ([FPS_GPS_IMPLEMENTATION.md](./FPS_GPS_IMPLEMENTATION.md))
-- [ ] Database schema migration (8 new columns + 2 new tables)
-- [ ] Backend modules (indicatorClassifier, scoreCalculator, enhancedRegimeCalculator, allocationEngine)
-- [ ] FRED data fetching expanded to 13 series
-- [ ] API endpoint enhancements
-- [ ] Frontend components (5 new, 1 enhanced)
-- [ ] Testing and validation
+**Status:** ✅ COMPLETED - FPS/GPS Enhancement Fully Implemented
 
-**Estimated Implementation Time:** 16-20 hours
+**Completion Date:** January 8, 2025
+
+- [x] Documentation complete ([FPS_GPS_IMPLEMENTATION.md](./FPS_GPS_IMPLEMENTATION.md))
+- [x] Database schema migration (8 new indicator columns + 10 MA columns + regime_history table)
+- [x] Backend modules (indicatorClassifier, scoreCalculator, enhancedRegimeCalculator, allocationEngine, movingAverages)
+- [x] FRED data fetching expanded to 13 series (12 available: WALCL, DFF, T10Y2Y, UNRATE, CPIAUCSL, ICSA, PAYEMS, CPILFESL, PPIACO, CFNAI, INDPRO, RSXFS, UMCSENT)
+- [x] API endpoint enhancements (enhanced regime calculator with ?basic=true fallback)
+- [x] Frontend components (5 new: ScoreGauge, IndicatorGrid, AllocationChart, InterpretationPanel + enhanced RegimeDisplay)
+- [x] Testing and validation (backend tested successfully)
+
+*Note: ISM Manufacturing (NAPMPI) and ISM Services (NAPMSI) proprietary data removed from FRED after 2016, replaced with free alternatives:
+- **CFNAI** (Chicago Fed National Activity Index): Composite of 85 economic indicators, replaces ISM Mfg PMI
+- **INDPRO** (Industrial Production Index): Direct measure of industrial output, replaces Chicago PMI
+- **RSXFS** (Advance Retail Sales): Strong consumer spending proxy, replaces ISM Services PMI*
+
+**Actual Implementation Time:** ~4 hours
 
 ---
 

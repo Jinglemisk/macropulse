@@ -47,5 +47,61 @@ module.exports = {
   port: process.env.PORT || 3001,
 
   // Cache TTL (24 hours in milliseconds)
-  cacheTTL: (process.env.CACHE_TTL_HOURS || 24) * 60 * 60 * 1000
+  cacheTTL: (process.env.CACHE_TTL_HOURS || 24) * 60 * 60 * 1000,
+
+  // ✅ FPS/GPS Enhancement: Configuration
+  fps: {
+    weights: {
+      unemployment: 1.5,
+      jobless_claims: 1.0,
+      nonfarm_payrolls: 1.5,
+      cpi_yoy: 1.5,
+      core_cpi_yoy: 2.0,
+      ppi: 1.0,
+      // ✅ Economic Activity Indicators (replacing proprietary ISM PMI data)
+      cfnai: 1.0,           // Chicago Fed National Activity Index (replaces ISM Mfg)
+      indpro: 0.5,          // Industrial Production Index
+      retail_sales: 1.0,    // Retail Sales (RSXFS - replaces ISM Services)
+      consumer_confidence: 0.5
+    },
+    tiltMagnitude: 0.25  // k parameter (25% max shift)
+  },
+
+  gps: {
+    weights: {
+      unemployment: 1.5,
+      jobless_claims: 1.0,
+      nonfarm_payrolls: 2.0,
+      // Note: CPI, Core CPI, PPI not used in GPS
+      cfnai: 1.5,           // Higher weight in GPS (composite economic indicator)
+      indpro: 0.5,
+      retail_sales: 1.5,    // Higher weight in GPS (growth proxy via RSXFS)
+      consumer_confidence: 1.0
+    },
+    tieBreakThreshold: 0.2,  // |FPS| threshold for GPS to activate
+    strongThreshold: 0.3     // GPS threshold for tie-break
+  },
+
+  // Indicator thresholds for FPS/GPS classification
+  thresholds: {
+    unemployment: { low: 4.0, high: 5.5 },
+    jobless_claims: { low: 250000, high: 350000 },
+    nonfarm_payrolls: { low: 50000, high: 250000 },
+    cpi_yoy: { low: 2.0, high: 3.0 },
+    core_cpi_yoy: { low: 2.0, high: 3.0 },
+    ppi: { low: 0, high: 0.2 },
+    // ✅ Economic Activity Indicator Thresholds (FRED RSXFS, CFNAI, INDPRO)
+    cfnai: { low: -0.7, high: 0.35 },          // Chicago Fed National Activity Index
+    indpro: { low: 0, high: 0.2 },             // Industrial Production (MoM % change)
+    retail_sales: { low: 0, high: 0.4 },       // Retail Sales (RSXFS - from FRED, not seasonally adjusted)
+    consumer_confidence: { low: 100, high: 120 }
+  },
+
+  // Base allocations by regime
+  baseAllocations: {
+    'Most Liquid': { A: 10, B: 20, C: 30, D: 40 },
+    'In Between (prefer C)': { A: 15, B: 25, C: 40, D: 20 },
+    'In Between (prefer B)': { A: 15, B: 40, C: 30, D: 15 },
+    'Least Liquid': { A: 60, B: 30, C: 10, D: 0 }
+  }
 };
