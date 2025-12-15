@@ -7,6 +7,7 @@
 
 import React from 'react';
 import '../styles/IndicatorGrid.css';
+import SectionTitle from './SectionTitle';
 
 function IndicatorGrid({ fpsBreakdown, gpsBreakdown }) {
   // Format indicator name for display
@@ -84,8 +85,13 @@ function IndicatorGrid({ fpsBreakdown, gpsBreakdown }) {
   const indicators = Array.from(allIndicators.values());
 
   return (
-    <div className="indicator-grid">
-      <h3 className="grid-title">Macro Indicators</h3>
+    <div id="macro" className="indicator-grid" style={{ scrollMarginTop: '20px' }}>
+      <SectionTitle
+        title="Macro Indicators"
+        description="Live economic data including unemployment, CPI, payrolls, and consumer confidence. Each indicator is classified as High/Normal/Low to compute FPS and GPS scores."
+        tag="h3"
+        className="grid-title-wrapper"
+      />
 
       <div className="grid-container">
         <table className="indicator-table">

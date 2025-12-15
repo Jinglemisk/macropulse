@@ -508,3 +508,10 @@ textarea:focus {
   outline: none;
   border-color: #00d9ff;
 }
+
+/* Responsive adjustments for side menu */
+@media (max-width: 768px) {
+  body {
+    padding-bottom: 80px;
+  }
+}

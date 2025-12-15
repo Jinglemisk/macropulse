@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import StockRow from './StockRow';
 import FilterControls from './FilterControls';
+import SectionTitle from './SectionTitle';
 
 function StockTable({ stocks, onRefresh, onDelete, onEditNotes, refreshing }) {
   const [filters, setFilters] = useState({
@@ -62,9 +63,17 @@ function StockTable({ stocks, onRefresh, onDelete, onEditNotes, refreshing }) {
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: '600' }}>
-          Portfolio ({filteredStocks.length} stocks)
-        </h2>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+          <SectionTitle
+            title="Portfolio"
+            description="Your classified stocks (A/B/C/D) with confidence scores based on revenue growth, P/E, and debt metrics. Click any row to add investment notes."
+            tag="h2"
+            className="portfolio-title-wrapper"
+          />
+          <span style={{ fontSize: '14px', color: '#a0a0a0' }}>
+            ({filteredStocks.length} stocks)
+          </span>
+        </div>
         <button className="primary" onClick={onRefresh} disabled={refreshing}>
           {refreshing ? 'Refreshing...' : 'Refresh All'}
         </button>

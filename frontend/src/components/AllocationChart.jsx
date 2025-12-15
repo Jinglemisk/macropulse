@@ -7,6 +7,7 @@
 
 import React from 'react';
 import '../styles/AllocationChart.css';
+import SectionTitle from './SectionTitle';
 
 function AllocationChart({ allocation, allocationSteps }) {
   // Class colors (same as theme)
@@ -21,8 +22,13 @@ function AllocationChart({ allocation, allocationSteps }) {
   const total = allocation.A + allocation.B + allocation.C + allocation.D;
 
   return (
-    <div className="allocation-chart">
-      <h3 className="chart-title">Recommended Allocation</h3>
+    <div id="advice" className="allocation-chart" style={{ scrollMarginTop: '20px' }}>
+      <SectionTitle
+        title="Recommended Allocation"
+        description="Portfolio allocation across Classes A-D based on Fed Pressure Score (FPS) and Growth Pulse Score (GPS). Shifts dynamically with macro regime changes."
+        tag="h3"
+        className="chart-title-wrapper"
+      />
 
       {/* Horizontal Stacked Bar */}
       <div className="allocation-bar-container">

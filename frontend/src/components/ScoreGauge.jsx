@@ -7,6 +7,12 @@
 
 import React from 'react';
 import '../styles/ScoreGauge.css';
+import SectionTitle from './SectionTitle';
+
+const SCORE_DESCRIPTIONS = {
+  'Fed Pressure Score (FPS)': 'Weighted composite of 10 indicators predicting Fed policy direction. Positive = hawkish (tightening), Negative = dovish (easing).',
+  'Growth Pulse Score (GPS)': 'Economic growth strength from 7 non-inflation indicators. Used as tie-breaker in ambiguous regimes when FPS is neutral.'
+};
 
 function ScoreGauge({ label, value, min = -1, max = 1, interpretation }) {
   // Calculate percentage for bar width (0-100)
@@ -55,7 +61,12 @@ function ScoreGauge({ label, value, min = -1, max = 1, interpretation }) {
   return (
     <div className="score-gauge">
       <div className="gauge-header">
-        <span className="gauge-label">{label}</span>
+        <SectionTitle
+          title={label}
+          description={SCORE_DESCRIPTIONS[label]}
+          tag="span"
+          className="gauge-title-wrapper"
+        />
         <span className="gauge-value" style={{ color }}>
           {value.toFixed(2)}
         </span>

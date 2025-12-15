@@ -7,6 +7,7 @@
 
 import React from 'react';
 import '../styles/InterpretationPanel.css';
+import SectionTitle from './SectionTitle';
 
 function InterpretationPanel({ messages }) {
   if (!messages || messages.length === 0) {
@@ -19,7 +20,12 @@ function InterpretationPanel({ messages }) {
 
   return (
     <div className="interpretation-panel">
-      <h3 className="panel-title">Regime Interpretation</h3>
+      <SectionTitle
+        title="Regime Interpretation"
+        description="Summary of current macro conditions and how FPS/GPS scores are influencing the recommended allocation strategy."
+        tag="h3"
+        className="panel-title-wrapper"
+      />
 
       {/* Regular Messages */}
       <div className="messages-list">

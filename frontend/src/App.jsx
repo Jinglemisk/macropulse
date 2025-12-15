@@ -3,6 +3,7 @@ import RegimeDisplay from './components/RegimeDisplay';
 import AddStockForm from './components/AddStockForm';
 import StockTable from './components/StockTable';
 import NotesPanel from './components/NotesPanel';
+import SideMenu from './components/SideMenu';
 import { stocksAPI, regimeAPI } from './utils/api';
 
 function App() {
@@ -97,47 +98,52 @@ function App() {
   }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1600px', margin: '0 auto' }}>
-      <header style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>
-          Investment Dashboard
-        </h1>
-        <p style={{ color: '#a0a0a0', fontSize: '14px' }}>
-          Track stock classifications across macro regimes
-        </p>
-      </header>
+    <>
+      <SideMenu />
+      <div style={{ padding: '24px', paddingLeft: '100px', maxWidth: '1700px', margin: '0 auto' }}>
+        <header id="home" style={{ marginBottom: '32px', scrollMarginTop: '20px' }}>
+          <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>
+            Macro Pulse 
+          </h1>
+          <p style={{ color: '#a0a0a0', fontSize: '14px' }}>
+            Track stock classifications across macro regimes
+          </p>
+        </header>
 
-      {error && (
-        <div className="error" style={{ marginBottom: '24px' }}>
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="error" style={{ marginBottom: '24px' }}>
+            {error}
+          </div>
+        )}
 
-      <RegimeDisplay
-        regime={regime}
-        loading={false}
-        error={regime ? null : 'Failed to load regime'}
-      />
-
-      <AddStockForm onAdd={handleAddStock} loading={adding} />
-
-      <StockTable
-        stocks={stocks}
-        onRefresh={handleRefreshAll}
-        onDelete={handleDeleteStock}
-        onEditNotes={(ticker, notes) => setEditingNotes({ ticker, notes })}
-        refreshing={refreshing}
-      />
-
-      {editingNotes && (
-        <NotesPanel
-          ticker={editingNotes.ticker}
-          notes={editingNotes.notes}
-          onSave={handleSaveNotes}
-          onClose={() => setEditingNotes(null)}
+        <RegimeDisplay
+          regime={regime}
+          loading={false}
+          error={regime ? null : 'Failed to load regime'}
         />
-      )}
-    </div>
+
+        <AddStockForm onAdd={handleAddStock} loading={adding} />
+
+        <section id="stocks" style={{ scrollMarginTop: '20px' }}>
+          <StockTable
+            stocks={stocks}
+            onRefresh={handleRefreshAll}
+            onDelete={handleDeleteStock}
+            onEditNotes={(ticker, notes) => setEditingNotes({ ticker, notes })}
+            refreshing={refreshing}
+          />
+        </section>
+
+        {editingNotes && (
+          <NotesPanel
+            ticker={editingNotes.ticker}
+            notes={editingNotes.notes}
+            onSave={handleSaveNotes}
+            onClose={() => setEditingNotes(null)}
+          />
+        )}
+      </div>
+    </>
   );
 }
 

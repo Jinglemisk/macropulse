@@ -1,0 +1,180 @@
+.side-menu {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 8px;
+  background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+  border-radius: 0 8px 8px 0;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+}
+
+.side-menu-item-wrapper {
+  position: relative;
+}
+
+.side-menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #a0a0a0;
+  min-width: 60px;
+}
+
+.side-menu-item:hover {
+  background: rgba(0, 217, 255, 0.1);
+  color: #00d9ff;
+}
+
+.side-menu-item:active {
+  transform: scale(0.95);
+}
+
+.side-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.side-menu-icon svg {
+  transition: stroke 0.2s ease;
+}
+
+.side-menu-item:hover .side-menu-icon svg {
+  stroke: #00d9ff;
+}
+
+.side-menu-label {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+/* Tooltip styles */
+.side-menu-tooltip {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 240px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #2d2d2d 0%, #252525 100%);
+  border: 1px solid #3a3a3a;
+  border-left: 3px solid #00d9ff;
+  border-radius: 6px;
+  box-shadow: 4px 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 200;
+  animation: tooltipFadeIn 0.2s ease;
+}
+
+.side-menu-tooltip::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: #3a3a3a;
+}
+
+.side-menu-tooltip::after {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: #2d2d2d;
+}
+
+.tooltip-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #00d9ff;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tooltip-description {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c0c0c0;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .side-menu {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    transform: none;
+    flex-direction: row;
+    justify-content: space-around;
+    border-radius: 8px 8px 0 0;
+    padding: 8px 16px;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .side-menu-item {
+    min-width: auto;
+    padding: 8px 16px;
+  }
+
+  /* Tooltip above on mobile */
+  .side-menu-tooltip {
+    left: 50%;
+    bottom: calc(100% + 12px);
+    top: auto;
+    transform: translateX(-50%);
+    width: 200px;
+  }
+
+  .side-menu-tooltip::before,
+  .side-menu-tooltip::after {
+    left: 50%;
+    top: auto;
+    bottom: -8px;
+    transform: translateX(-50%) rotate(90deg);
+  }
+
+  .side-menu-tooltip::after {
+    bottom: -6px;
+  }
+
+  @keyframes tooltipFadeIn {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+}
