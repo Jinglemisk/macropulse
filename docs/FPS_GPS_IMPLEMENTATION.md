@@ -1016,7 +1016,7 @@ module.exports = {
 
 ### Phase 4: Backend - API (1 hour)
 - [ ] Update `backend/routes/regime.js`
-- [ ] Test: `curl http://localhost:3001/api/regime`
+- [ ] Test: `curl http://localhost:8345/api/regime`
 
 ### Phase 5: Frontend (6 hours)
 - [ ] Create `ScoreGauge.jsx`

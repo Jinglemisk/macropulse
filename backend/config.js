@@ -44,7 +44,7 @@ module.exports = {
   },
 
   // Server port
-  port: process.env.PORT || 3001,
+  port: process.env.PORT || 8345,
 
   // Cache TTL (24 hours in milliseconds)
   cacheTTL: (process.env.CACHE_TTL_HOURS || 24) * 60 * 60 * 1000,

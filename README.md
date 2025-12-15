@@ -1,10 +1,6 @@
 # Macro Pulse
 
-> **⚠️ Disclaimer**
->
-> This application is provided for informational and educational purposes only. It is not investment advice and should not be relied upon for making investment decisions. The classifications and regime indicators are based on historical patterns and do not guarantee future results. Users are responsible for conducting their own research and due diligence.
-
-Macro Compass is a locally-hosted financial analysis dashboard that classifies stocks by fundamental characteristics and analyzes portfolio allocation across different macroeconomic regimes. The application combines traditional fundamental analysis with regime-based positioning using Federal Reserve policy indicators.
+This is a simple dashboard that classifies stocks by a basket of macroeconomic parameters and proposes a portfolio allocation stategy based on the incumbent US macroeconmic regime. 
 
 The system operates on two core principles: (1) stocks can be classified into four distinct categories based on growth rates, valuation metrics, and debt levels, and (2) optimal allocation shifts with changes in monetary policy conditions.
 
@@ -23,7 +19,7 @@ The dashboard provides:
 
 ## Classification System
 
-Stocks are categorized into four classes based on fundamental metrics:
+Stocks are categorized into four classes based on fundamental metrics. This model is easily configurable, with or without AI support.
 
 **Class A (Blue) - Value/Defensive**
 - Target characteristics: ~5% revenue growth, ~10x forward P/E, minimal debt
@@ -170,7 +166,7 @@ FRED_API_KEY=your_fred_api_key_here
 PYTHON_PATH=python3
 
 # Server config
-PORT=3001
+PORT=8345
 DATABASE_PATH=./data/stocks.db
 CACHE_TTL_HOURS=24
 OPENBB_TIMEOUT_MS=30000
@@ -332,9 +328,7 @@ npm run fetch-macro
 
 ## Documentation
 
-- **[Implementation Guide](./docs/Implementation.md)** - Complete technical specification including database schema, API architecture, classification algorithms, and FPS/GPS calculation logic
 - **[FPS/GPS Enhancement Specification](./docs/FPS_GPS_IMPLEMENTATION.md)** - Detailed documentation of the Fed Pressure Score and Growth Pulse Score system
-- **[OpenBB Migration Guide](./docs/OPENBB_MIGRATION_GUIDE.md)** - OpenBB Platform integration architecture, provider configuration, and troubleshooting
 - **[Investment Methodology](./docs/how-to-invest.md)** - Theoretical framework underlying the classification system and regime analysis
 
 ## Additional Information
@@ -361,7 +355,3 @@ MIT - Do whatever you want with it. See [LICENSE](./LICENSE) for details.
 - [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
 - [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) - High-performance SQLite driver
 - [Claude Code](https://claude.com/claude-code) - Development assistance and integrated OpenBB agent
-
----
-
-**Macro Compass** - A regime-based portfolio analysis framework for local deployment.
