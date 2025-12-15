@@ -5,11 +5,24 @@ frontend/node_modules/
 # Environment variables
 .env
 
+# Claude AI
+.claude/
+Claude.md
+CLAUDE.md
+
+# Local backups
+.scrub-backup/
+
 # Database
 data/stocks.db
 data/*.db
 data/stocks.db-shm 
 data/stocks.db-wal 
+*.db
+*.db-*
+*.db.*
+*.sqlite*
+*.duckdb*
 
 # Build outputs
 frontend/dist/
@@ -30,4 +43,3 @@ Thumbs.db
 .cache/
 *.cache
 frontend/.vite/
-
