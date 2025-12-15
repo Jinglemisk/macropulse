@@ -129,7 +129,7 @@ function classifyBaseRegime(latestMacro) {
       ratePercentile: Math.round(ratePercentile * 100) / 100,
       balanceSheetSlope,
       balanceSheetIncreasing,
-      balanceSheetChange12w: Math.round(balanceSheetSlope / 1000000000 * 10) / 10,  // Billions
+      balanceSheetChange12w: Math.round(balanceSheetSlope / 1000),  // Billions (WALCL is in millions)
       asOf: latestMacro.date
     }
   };
