@@ -12,9 +12,11 @@ const { calculateAllocation } = require('./allocationEngine');
 
 /**
  * Get latest macro data with moving averages
+ * Combines latest DFF (daily) with latest WALCL (weekly) for accurate regime calculation
  * @returns {object} - Latest macro data row with all indicators and MAs
  */
 function getLatestMacroDataWithMA() {
+  // Get the row with the most recent date that has indicator data
   const latest = db.prepare(`
     SELECT * FROM macro_data
     WHERE walcl IS NOT NULL
@@ -24,6 +26,20 @@ function getLatestMacroDataWithMA() {
 
   if (!latest) {
     throw new Error('No macro data available. Run updateMacroData() first.');
+  }
+
+  // Get the most recent DFF value (updated daily, may be newer than WALCL)
+  const latestDff = db.prepare(`
+    SELECT date as dff_date, dff FROM macro_data
+    WHERE dff IS NOT NULL
+    ORDER BY date DESC
+    LIMIT 1
+  `).get();
+
+  // Override with latest DFF if available and newer
+  if (latestDff && latestDff.dff !== null) {
+    latest.dff = latestDff.dff;
+    latest.dff_date = latestDff.dff_date;
   }
 
   return latest;

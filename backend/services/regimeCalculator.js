@@ -5,23 +5,32 @@ const db = require('../database');
  * @returns {Object} - { regime, description, recommendation, metrics }
  */
 function calculateRegime() {
-  // 1. Get latest data (with valid WALCL - published weekly by FRED)
-  const latestMacro = db.prepare(`
-    SELECT * FROM macro_data
+  // 1. Get latest DFF (Fed Funds Rate) - updated daily
+  const latestDff = db.prepare(`
+    SELECT date, dff FROM macro_data
+    WHERE dff IS NOT NULL
+    ORDER BY date DESC
+    LIMIT 1
+  `).get();
+
+  // 2. Get latest WALCL (Balance Sheet) - published weekly by FRED
+  const latestWalcl = db.prepare(`
+    SELECT date, walcl FROM macro_data
     WHERE walcl IS NOT NULL
     ORDER BY date DESC
     LIMIT 1
   `).get();
 
-  if (!latestMacro) {
+  if (!latestDff || !latestWalcl) {
     throw new Error('No macro data available. Run fetch-macro script first.');
   }
 
-  const dffToday = latestMacro.dff;
-  const walclToday = latestMacro.walcl;
+  const dffToday = latestDff.dff;
+  const walclToday = latestWalcl.walcl;
+  const latestMacro = { date: latestDff.date, walclDate: latestWalcl.date };
 
-  // 2. Get 12-week-ago balance sheet value
-  const date12WeeksAgo = subtractDays(latestMacro.date, 84);  // 12 weeks = 84 days
+  // 3. Get 12-week-ago balance sheet value
+  const date12WeeksAgo = subtractDays(latestMacro.walclDate, 84);  // 12 weeks = 84 days
 
   const walcl12WeeksAgo = db.prepare(`
     SELECT walcl FROM macro_data
