@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./macropulse.jpeg" alt="Macropulse logo" width="640" />
+  <img src="./macropulse.jpeg" alt="Macropulse logo" width="320" />
   <h1>Macropulse</h1>
 </div>
 
