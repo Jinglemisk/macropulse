@@ -1,4 +1,7 @@
-# Macro Pulse
+<div align="center">
+  <img src="./macropulse.jpeg" alt="Macropulse logo" width="640" />
+  <h1>Macropulse</h1>
+</div>
 
 This is a simple dashboard that classifies stocks by a basket of macroeconomic parameters and proposes a portfolio allocation stategy based on the incumbent US macroeconmic regime. 
 
