@@ -6,6 +6,7 @@ const db = new Database(dbPath);
 
 // Enable WAL mode for better concurrency
 db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
 // Create tables if they don't exist
 function initializeTables() {
@@ -54,6 +55,60 @@ function initializeTables() {
       FOREIGN KEY (ticker) REFERENCES stocks(ticker) ON DELETE CASCADE
     )
   `);
+
+  // Refresh metadata for stock quote/detail operations
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS stock_refresh_status (
+      ticker TEXT PRIMARY KEY,
+      last_quote_refresh_at TEXT,
+      last_detail_refresh_at TEXT,
+      last_quote_refresh_status TEXT DEFAULT 'never',
+      last_detail_refresh_status TEXT DEFAULT 'never',
+      last_quote_refresh_error TEXT,
+      last_detail_refresh_error TEXT,
+      last_successful_quote_refresh_at TEXT,
+      last_successful_detail_refresh_at TEXT,
+      data_source_quote TEXT,
+      data_source_detail TEXT,
+      quote_data_warning TEXT,
+      detail_data_warning TEXT,
+      detail_is_partial INTEGER DEFAULT 0,
+      detail_missing_fields TEXT,
+      classification_status TEXT DEFAULT 'never',
+      classification_warning TEXT,
+      classification_eligible INTEGER DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (ticker) REFERENCES stocks(ticker) ON DELETE CASCADE
+    )
+  `);
+
+  // Refresh metadata for macro operations
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS macro_refresh_status (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      last_macro_refresh_at TEXT,
+      last_macro_refresh_status TEXT DEFAULT 'never',
+      last_macro_refresh_error TEXT,
+      last_successful_macro_refresh_at TEXT,
+      missing_series TEXT,
+      failed_series TEXT,
+      stale_series TEXT,
+      stale_series_count INTEGER DEFAULT 0,
+      series_status TEXT,
+      warning_message TEXT,
+      updated_at TEXT NOT NULL
+    )
+  `);
+
+  db.prepare(`
+    INSERT OR IGNORE INTO macro_refresh_status (
+      id,
+      last_macro_refresh_status,
+      stale_series_count,
+      updated_at
+    )
+    VALUES (1, 'never', 0, ?)
+  `).run(new Date().toISOString());
 
   // Macro data table
   db.exec(`

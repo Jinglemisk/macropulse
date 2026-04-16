@@ -34,21 +34,32 @@ async function getFundamentals(ticker) {
     const result = {
       ticker,
       companyName: quoteData.longName || quoteData.shortName || ticker,
-      sector: quoteData.sector || 'Unknown',
-      latestPrice: quoteData.regularMarketPrice || quoteData.currentPrice || null,
+      sector: statsData.sector || quoteData.sector || 'Unknown',
+      latestPrice: quoteData.regularMarketPrice ?? quoteData.currentPrice ?? null,
       priceTimestamp: new Date().toISOString(),
 
       // Fundamental metrics
-      revenueGrowth: statsData.revenueGrowth || null,
-      epsGrowth: statsData.earningsGrowth || null,
-      peForward: quoteData.forwardPE || statsData.forwardPE || null,
-      debtEbitda: statsData.debtToEquity ? statsData.debtToEquity / 100 : null,
+      revenueGrowth: statsData.revenueGrowth ?? null,
+      epsGrowth: statsData.earningsGrowth ?? null,
+      peForward: quoteData.forwardPE ?? statsData.forwardPE ?? null,
+      // Yahoo's free endpoints expose debt/equity more reliably than debt/EBITDA.
+      // Leave leverage as null rather than mapping a different ratio into this field.
+      debtEbitda: null,
 
       // Flags
       epsPositive: (quoteData.epsForward || 0) > 0,
-      ebitdaPositive: true,
+      ebitdaPositive: null,
       peAvailable: (quoteData.forwardPE || statsData.forwardPE) !== null
     };
+
+    if (
+      result.latestPrice === null &&
+      result.revenueGrowth === null &&
+      result.epsGrowth === null &&
+      result.peForward === null
+    ) {
+      throw new Error(`No usable Yahoo Finance data returned for ${ticker}`);
+    }
 
     // Cache for 24 hours
     setCache(cacheKey, result, config.cacheTTL);
@@ -115,16 +126,16 @@ async function fetchStatsData(ticker) {
       ? financialData.earningsGrowth.raw * 100
       : null;
 
-    const forwardPE = keyStats.forwardPE?.raw || financialData.currentPrice?.raw / (keyStats.forwardEps?.raw || 1);
+    const forwardPE = keyStats.forwardPE?.raw ?? (financialData.currentPrice?.raw / (keyStats.forwardEps?.raw || 1));
 
-    const debtToEquity = keyStats.debtToEquity?.raw || null;
+    const debtToEquity = keyStats.debtToEquity?.raw ?? null;
 
     return {
       revenueGrowth,
       earningsGrowth,
       forwardPE,
       debtToEquity,
-      sector: profile.sector || 'Unknown'
+      sector: profile.sector || null
     };
   } catch (error) {
     console.error(`Error fetching stats for ${ticker}:`, error.message);
@@ -133,7 +144,8 @@ async function fetchStatsData(ticker) {
       revenueGrowth: null,
       earningsGrowth: null,
       forwardPE: null,
-      debtToEquity: null
+      debtToEquity: null,
+      sector: null
     };
   }
 }

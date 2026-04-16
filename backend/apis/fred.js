@@ -1,146 +1,222 @@
 const openbb = require('./openbb');
-const config = require('../config');
 const db = require('../database');
 const { updateMovingAverages } = require('../utils/movingAverages');
 
-/**
- * ⚠️ MIGRATED TO OPENBB PLATFORM
- *
- * This module now uses OpenBB Platform for FRED data access.
- * - Unified API access via OpenBB
- * - Better error handling and retry logic
- * - Database storage: PRESERVED (same schema)
- */
+const MACRO_SERIES = [
+  { id: 'WALCL', field: 'walcl', cadenceDays: 21 },
+  { id: 'DFF', field: 'dff', cadenceDays: 7 },
+  { id: 'T10Y2Y', field: 't10y2y', cadenceDays: 7 },
+  { id: 'UNRATE', field: 'unrate', cadenceDays: 62 },
+  { id: 'CPIAUCSL', field: 'cpiaucsl', cadenceDays: 62 },
+  { id: 'ICSA', field: 'jobless_claims', cadenceDays: 21 },
+  { id: 'PAYEMS', field: 'nonfarm_payrolls', cadenceDays: 62 },
+  { id: 'CPILFESL', field: 'core_cpi', cadenceDays: 62 },
+  { id: 'PPIACO', field: 'ppi', cadenceDays: 62 },
+  { id: 'CFNAI', field: 'cfnai', cadenceDays: 62 },
+  { id: 'INDPRO', field: 'indpro', cadenceDays: 62 },
+  { id: 'RSXFS', field: 'retail_sales', cadenceDays: 62 },
+  { id: 'UMCSENT', field: 'consumer_confidence', cadenceDays: 62 }
+];
 
-/**
- * Fetch and store expanded FRED macro data via OpenBB
- * @param {number} days - Number of days to fetch (default 365)
- *
- * ✅ FPS/GPS Enhancement: Expanded to 15 FRED series:
- * - WALCL: Fed Balance Sheet
- * - DFF: Fed Funds Rate
- * - T10Y2Y: 10-Year minus 2-Year Treasury Yield Spread
- * - UNRATE: Unemployment Rate
- * - CPIAUCSL: Consumer Price Index (All Items)
- * - ICSA: Initial Jobless Claims (Weekly)
- * - PAYEMS: Nonfarm Payrolls (Total Employees)
- * - CPILFESL: Core CPI (Less Food & Energy)
- * - PPIACO: Producer Price Index (All Commodities)
- * - CFNAI: Chicago Fed National Activity Index (replaces ISM Mfg PMI)
- * - INDPRO: Industrial Production Index (replaces Chicago PMI)
- * - RSXFS: Retail and Food Services Sales (CORRECTED - RETAILSMNS doesn't exist in FRED via OpenBB)
- * - UMCSENT: University of Michigan Consumer Sentiment
- * - Note: ISM PMI (NAPMPI/NAPMSI) proprietary - not available via FRED after 2016
- */
+function addToMap(dateMap, data, field) {
+  data.forEach(observation => {
+    if (!dateMap.has(observation.date)) {
+      dateMap.set(observation.date, {});
+    }
+
+    dateMap.get(observation.date)[field] = parseFloat(observation.value);
+  });
+}
+
+function daysBetween(laterDate, earlierDate) {
+  const later = new Date(laterDate);
+  const earlier = new Date(earlierDate);
+  return Math.floor((later - earlier) / (1000 * 60 * 60 * 24));
+}
+
+function getSeriesSnapshot(seriesConfig, asOfDate) {
+  const row = db.prepare(`
+    SELECT date
+    FROM macro_data
+    WHERE ${seriesConfig.field} IS NOT NULL
+    ORDER BY date DESC
+    LIMIT 1
+  `).get();
+
+  const latestObservationDate = row?.date || null;
+  const stale = latestObservationDate
+    ? daysBetween(asOfDate, latestObservationDate) > seriesConfig.cadenceDays
+    : false;
+
+  return {
+    latestObservationDate,
+    stale
+  };
+}
+
+function buildSeriesStatus(seriesFetchResults, asOfDate) {
+  const seriesStatus = {};
+  const succeededSeries = [];
+  const failedSeries = [];
+  const missingSeries = [];
+  const staleSeries = [];
+
+  for (const config of MACRO_SERIES) {
+    const fetchResult = seriesFetchResults[config.id];
+    const snapshot = getSeriesSnapshot(config, asOfDate);
+    const hadSuccessfulFetch = fetchResult.status === 'success';
+
+    if (hadSuccessfulFetch) {
+      succeededSeries.push(config.id);
+    } else {
+      failedSeries.push(config.id);
+    }
+
+    if (!snapshot.latestObservationDate) {
+      missingSeries.push(config.id);
+    }
+
+    if (snapshot.stale) {
+      staleSeries.push(config.id);
+    }
+
+    seriesStatus[config.id] = {
+      field: config.field,
+      cadenceDays: config.cadenceDays,
+      fetchStatus: fetchResult.status,
+      pointsFetched: fetchResult.pointsFetched,
+      error: fetchResult.error,
+      latestObservationDate: snapshot.latestObservationDate,
+      stale: snapshot.stale
+    };
+  }
+
+  let status = 'success';
+  if (succeededSeries.length === 0) {
+    status = 'failed';
+  } else if (failedSeries.length > 0 || missingSeries.length > 0 || staleSeries.length > 0) {
+    status = 'warning';
+  }
+
+  let message = 'Macro refresh completed successfully.';
+  if (status === 'failed') {
+    message = 'Macro refresh failed for all tracked series.';
+  } else if (status === 'warning') {
+    const parts = [];
+    if (failedSeries.length > 0) {
+      parts.push(`${failedSeries.length} fetch failure${failedSeries.length === 1 ? '' : 's'}`);
+    }
+    if (missingSeries.length > 0) {
+      parts.push(`${missingSeries.length} missing series`);
+    }
+    if (staleSeries.length > 0) {
+      parts.push(`${staleSeries.length} stale series`);
+    }
+    message = `Macro refresh completed with warnings: ${parts.join(', ')}.`;
+  }
+
+  return {
+    status,
+    message,
+    succeededSeries,
+    failedSeries,
+    missingSeries,
+    staleSeries,
+    staleSeriesCount: staleSeries.length,
+    seriesStatus
+  };
+}
+
 async function updateMacroData(days = 365) {
   const endDate = new Date().toISOString().split('T')[0];
   const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-  try {
-    console.log(`📊 Fetching 15 FRED series for FPS/GPS from ${startDate} to ${endDate} via OpenBB...`);
+  console.log(`📊 Fetching ${MACRO_SERIES.length} macro series from ${startDate} to ${endDate} via OpenBB...`);
 
-    // ✅ FPS/GPS: Fetch all 12 available series in parallel
-    // Note: NAPMPI & NAPMSI (ISM PMI) removed from FRED in 2016
-    const [
-      walclData, dffData, yieldCurveData, unrateData, cpiData,
-      joblessData, payrollsData, coreCpiData, ppiData,
-      cfnaiData, indproData, retailData, consConfData
-    ] = await Promise.all([
-      openbb.getFredSeries('WALCL', startDate, endDate),
-      openbb.getFredSeries('DFF', startDate, endDate),
-      openbb.getFredSeries('T10Y2Y', startDate, endDate),
-      openbb.getFredSeries('UNRATE', startDate, endDate),
-      openbb.getFredSeries('CPIAUCSL', startDate, endDate),
-      openbb.getFredSeries('ICSA', startDate, endDate),
-      openbb.getFredSeries('PAYEMS', startDate, endDate),
-      openbb.getFredSeries('CPILFESL', startDate, endDate),
-      openbb.getFredSeries('PPIACO', startDate, endDate),
-      openbb.getFredSeries('CFNAI', startDate, endDate),       // Chicago Fed Activity Index
-      openbb.getFredSeries('INDPRO', startDate, endDate),      // Industrial Production
-      openbb.getFredSeries('RSXFS', startDate, endDate),       // Retail and Food Services Sales (CORRECTED from RETAILSMNS)
-      openbb.getFredSeries('UMCSENT', startDate, endDate)
-    ]);
+  const fetchResults = await Promise.allSettled(
+    MACRO_SERIES.map(series => openbb.getFredSeries(series.id, startDate, endDate))
+  );
 
-    console.log('📈 Data points fetched (FPS/GPS indicators):');
-    console.log(`  Core: WALCL=${walclData.length}, DFF=${dffData.length}, T10Y2Y=${yieldCurveData.length}`);
-    console.log(`  Labor: UNRATE=${unrateData.length}, ICSA=${joblessData.length}, PAYEMS=${payrollsData.length}`);
-    console.log(`  Inflation: CPI=${cpiData.length}, CoreCPI=${coreCpiData.length}, PPI=${ppiData.length}`);
-    console.log(`  Activity: CFNAI=${cfnaiData.length}, INDPRO=${indproData.length}, Retail=${retailData.length}, ConsSent=${consConfData.length}`);
+  const dateMap = new Map();
+  const seriesFetchResults = {};
 
-    // Merge all series by date
-    const dateMap = new Map();
+  fetchResults.forEach((result, index) => {
+    const series = MACRO_SERIES[index];
 
-    // Helper function to add data to map
-    const addToMap = (data, field) => {
-      data.forEach(obs => {
-        if (!dateMap.has(obs.date)) dateMap.set(obs.date, {});
-        dateMap.get(obs.date)[field] = parseFloat(obs.value);
-      });
-    };
-
-    // ✅ FPS/GPS: Merge all 12 series
-    addToMap(walclData, 'walcl');
-    addToMap(dffData, 'dff');
-    addToMap(yieldCurveData, 't10y2y');
-    addToMap(unrateData, 'unrate');
-    addToMap(cpiData, 'cpiaucsl');
-    addToMap(joblessData, 'jobless_claims');
-    addToMap(payrollsData, 'nonfarm_payrolls');
-    addToMap(coreCpiData, 'core_cpi');
-    addToMap(ppiData, 'ppi');
-    addToMap(cfnaiData, 'cfnai');
-    addToMap(indproData, 'indpro');
-    addToMap(retailData, 'retail_sales');
-    addToMap(consConfData, 'consumer_confidence');
-
-    // ✅ FPS/GPS: Insert all 12 series + 3 alternatives
-    const insertStmt = db.prepare(`
-      INSERT OR REPLACE INTO macro_data (
-        date, walcl, dff, t10y2y, unrate, cpiaucsl,
-        jobless_claims, nonfarm_payrolls, core_cpi, ppi,
-        cfnai, indpro, retail_sales, consumer_confidence,
-        fetched_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const now = new Date().toISOString();
-    let count = 0;
-
-    for (const [date, values] of dateMap) {
-      // Insert if we have any core metrics
-      if (values.walcl || values.dff || values.unrate || values.cpiaucsl) {
-        insertStmt.run(
-          date,
-          values.walcl || null,
-          values.dff || null,
-          values.t10y2y || null,
-          values.unrate || null,
-          values.cpiaucsl || null,
-          values.jobless_claims || null,
-          values.nonfarm_payrolls || null,
-          values.core_cpi || null,
-          values.ppi || null,
-          values.cfnai || null,
-          values.indpro || null,
-          values.retail_sales || null,
-          values.consumer_confidence || null,
-          now
-        );
-        count++;
-      }
+    if (result.status === 'fulfilled') {
+      const data = Array.isArray(result.value) ? result.value : [];
+      addToMap(dateMap, data, series.field);
+      seriesFetchResults[series.id] = {
+        status: data.length > 0 ? 'success' : 'failed',
+        pointsFetched: data.length,
+        error: data.length > 0 ? null : 'No observations returned'
+      };
+      return;
     }
 
-    console.log(`✅ Updated ${count} days of FPS/GPS macro data (12 series + 3 alternatives)`);
+    seriesFetchResults[series.id] = {
+      status: 'failed',
+      pointsFetched: 0,
+      error: result.reason?.message || String(result.reason)
+    };
+    console.warn(`⚠️ ${series.id} fetch failed: ${seriesFetchResults[series.id].error}`);
+  });
 
-    // ✅ FPS/GPS: Calculate moving averages after data insertion
-    await updateMovingAverages();
+  const insertStmt = db.prepare(`
+    INSERT OR REPLACE INTO macro_data (
+      date, walcl, dff, t10y2y, unrate, cpiaucsl,
+      jobless_claims, nonfarm_payrolls, core_cpi, ppi,
+      cfnai, indpro, retail_sales, consumer_confidence,
+      fetched_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
 
-    return count;
-  } catch (error) {
-    console.error('❌ FRED data fetch failed:', error.message);
-    throw error;
+  const now = new Date().toISOString();
+  let updatedDays = 0;
+
+  for (const [date, values] of dateMap) {
+    if (Object.keys(values).length === 0) {
+      continue;
+    }
+
+    insertStmt.run(
+      date,
+      values.walcl ?? null,
+      values.dff ?? null,
+      values.t10y2y ?? null,
+      values.unrate ?? null,
+      values.cpiaucsl ?? null,
+      values.jobless_claims ?? null,
+      values.nonfarm_payrolls ?? null,
+      values.core_cpi ?? null,
+      values.ppi ?? null,
+      values.cfnai ?? null,
+      values.indpro ?? null,
+      values.retail_sales ?? null,
+      values.consumer_confidence ?? null,
+      now
+    );
+    updatedDays++;
   }
+
+  if (updatedDays > 0) {
+    await updateMovingAverages();
+  }
+
+  const summary = buildSeriesStatus(seriesFetchResults, endDate);
+
+  return {
+    ...summary,
+    updatedDays,
+    dateRange: {
+      startDate,
+      endDate
+    }
+  };
 }
 
-module.exports = { updateMacroData };
+module.exports = {
+  MACRO_SERIES,
+  updateMacroData
+};

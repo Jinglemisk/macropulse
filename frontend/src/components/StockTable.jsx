@@ -1,10 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import StockRow from './StockRow';
 import FilterControls from './FilterControls';
 import SectionTitle from './SectionTitle';
 
-function StockTable({ stocks, onRefresh, onDelete, onEditNotes, refreshing }) {
+function StockTable({
+  stocks,
+  onDelete,
+  onEditNotes,
+  macroRefresh
+}) {
   const [filters, setFilters] = useState({
+    search: '',
     class: 'all',
     confidence: 'all',
     sector: 'all',
@@ -12,32 +18,37 @@ function StockTable({ stocks, onRefresh, onDelete, onEditNotes, refreshing }) {
     sortOrder: 'asc'
   });
 
-  // Apply filters and sorting
   const filteredStocks = useMemo(() => {
     let result = [...stocks];
 
-    // Filter by class
+    if (filters.search.trim()) {
+      const query = filters.search.trim().toLowerCase();
+      result = result.filter(stock =>
+        stock.ticker.toLowerCase().includes(query) ||
+        stock.companyName?.toLowerCase().includes(query) ||
+        stock.sector?.toLowerCase().includes(query)
+      );
+    }
+
     if (filters.class !== 'all') {
-      result = result.filter(s => s.classification?.class === filters.class);
+      result = result.filter(stock => stock.classification?.class === filters.class);
     }
 
-    // Filter by confidence
     if (filters.confidence === 'high') {
-      result = result.filter(s => s.classification?.confidence > 0.40);
+      result = result.filter(stock => stock.classification?.confidence > 0.40);
     } else if (filters.confidence === 'medium') {
-      result = result.filter(s => s.classification?.confidence >= 0.20 && s.classification?.confidence <= 0.40);
+      result = result.filter(stock => stock.classification?.confidence >= 0.20 && stock.classification?.confidence <= 0.40);
     } else if (filters.confidence === 'low') {
-      result = result.filter(s => s.classification?.confidence < 0.20);
+      result = result.filter(stock => stock.classification?.confidence < 0.20);
     }
 
-    // Filter by sector
     if (filters.sector !== 'all') {
-      result = result.filter(s => s.sector === filters.sector);
+      result = result.filter(stock => stock.sector === filters.sector);
     }
 
-    // Sort
     result.sort((a, b) => {
-      let aVal, bVal;
+      let aVal;
+      let bVal;
 
       if (filters.sortBy === 'ticker') {
         aVal = a.ticker;
@@ -52,9 +63,9 @@ function StockTable({ stocks, onRefresh, onDelete, onEditNotes, refreshing }) {
 
       if (filters.sortOrder === 'asc') {
         return aVal > bVal ? 1 : -1;
-      } else {
-        return aVal < bVal ? 1 : -1;
       }
+
+      return aVal < bVal ? 1 : -1;
     });
 
     return result;
@@ -71,12 +82,9 @@ function StockTable({ stocks, onRefresh, onDelete, onEditNotes, refreshing }) {
             className="portfolio-title-wrapper"
           />
           <span style={{ fontSize: '14px', color: '#a0a0a0' }}>
-            ({filteredStocks.length} stocks)
+            ({filteredStocks.length}{filteredStocks.length !== stocks.length ? ` of ${stocks.length}` : ''} stocks)
           </span>
         </div>
-        <button className="primary" onClick={onRefresh} disabled={refreshing}>
-          {refreshing ? 'Refreshing...' : 'Refresh All'}
-        </button>
       </div>
 
       <FilterControls
@@ -109,6 +117,7 @@ function StockTable({ stocks, onRefresh, onDelete, onEditNotes, refreshing }) {
               stock={stock}
               onDelete={onDelete}
               onEditNotes={onEditNotes}
+              macroRefresh={macroRefresh}
             />
           ))
         )}

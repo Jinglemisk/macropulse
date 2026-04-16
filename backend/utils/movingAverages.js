@@ -173,16 +173,16 @@ async function updateMovingAverages() {
     let updatedCount = 0;
     for (const row of allData) {
       updateStmt.run(
-        maUnrate.get(row.date) || null,
-        maJobless.get(row.date) || null,
-        maPayrolls.get(row.date) || null,
-        maCpiYoY.get(row.date) || null,
-        maCoreCpiYoY.get(row.date) || null,
-        maPpi.get(row.date) || null,
-        maCfnai.get(row.date) || null,
-        maIndpro.get(row.date) || null,
-        maRetail.get(row.date) || null,
-        maConsCon.get(row.date) || null,
+        maUnrate.get(row.date) ?? null,
+        maJobless.get(row.date) ?? null,
+        maPayrolls.get(row.date) ?? null,
+        maCpiYoY.get(row.date) ?? null,
+        maCoreCpiYoY.get(row.date) ?? null,
+        maPpi.get(row.date) ?? null,
+        maCfnai.get(row.date) ?? null,
+        maIndpro.get(row.date) ?? null,
+        maRetail.get(row.date) ?? null,
+        maConsCon.get(row.date) ?? null,
         row.date
       );
       updatedCount++;

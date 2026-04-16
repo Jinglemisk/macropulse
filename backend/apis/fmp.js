@@ -1,4 +1,6 @@
 const openbb = require('./openbb');
+const yahooFinance = require('./yahooFinance');
+const yahoo = require('./yahoo');
 const config = require('../config');
 const { getCached, setCache } = require('./cache');
 const providerHealth = require('../utils/providerHealth');
@@ -23,56 +25,118 @@ function getConfiguredProviders(primaryEnvKey, fallbackEnvKey, defaultPrimary = 
   return providerHealth.sortProvidersByHealth(parseProviders(primary, fallbacks));
 }
 
-/**
- * ⚠️ MIGRATED TO OPENBB PLATFORM
- *
- * This module now uses OpenBB Platform for unified API access with provider redundancy.
- * - Primary: FMP (via OpenBB)
- * - Fallback: yfinance, intrinio
- * - Cache layer: PRESERVED (24-hour TTL)
- * - Health tracking: Automatically prioritizes reliable providers
- *
- * OpenBB Platform normalizes percentage fields to decimals (0.08 = 8%)
- */
+function isPresent(value) {
+  return value !== null && value !== undefined;
+}
 
-/**
- * Fetch company fundamentals + price via OpenBB with provider fallback
- *
- * ⚠️ IMPORTANT: Calls TWO separate OpenBB endpoints:
- * 1. obb.equity.fundamental.metrics() - For fundamentals (P/E, revenue growth, etc.)
- * 2. obb.equity.price.quote() - For current stock price
- *
- * This is the correct OpenBB Platform pattern as fundamentals do NOT include price.
- *
- * @param {string} ticker
- * @returns {Object} - Parsed fundamentals with price and flags
- */
-async function getFundamentals(ticker) {
-  // ✅ PRESERVED: Check cache first
-  const cacheKey = `fundamentals_${ticker}`;
-  const cached = getCached(cacheKey);
+function isDecimalFormat(value) {
+  return value !== null && value !== undefined && Math.abs(value) < 1.5;
+}
+
+function convertToPercentage(value) {
+  if (!isPresent(value)) return null;
+  return isDecimalFormat(value) ? value * 100 : value;
+}
+
+function normalizeOpenbbFundamentals(openbbData, ticker) {
+  const debtEbitda = openbbData.debt_to_ebitda !== null && openbbData.debt_to_ebitda < 0
+    ? 0
+    : openbbData.debt_to_ebitda;
+
+  return {
+    ticker,
+    companyName: openbbData.company_name || ticker,
+    sector: openbbData.sector || null,
+    revenueGrowth: convertToPercentage(openbbData.revenue_growth),
+    epsGrowth: convertToPercentage(openbbData.eps_growth),
+    peForward: openbbData.pe_forward,
+    debtEbitda,
+    eps: openbbData.eps,
+    ebitda: openbbData.ebitda,
+    epsPositive: openbbData.eps !== null && openbbData.eps > 0,
+    ebitdaPositive: openbbData.ebitda !== null && openbbData.ebitda > 0,
+    peAvailable: openbbData.pe_forward !== null && openbbData.pe_forward > 0
+  };
+}
+
+function mergeFundamentals(details, quote, ticker) {
+  return {
+    ticker,
+    companyName: details.companyName || ticker,
+    sector: details.sector || null,
+    revenueGrowth: details.revenueGrowth ?? null,
+    epsGrowth: details.epsGrowth ?? null,
+    peForward: details.peForward ?? null,
+    debtEbitda: details.debtEbitda ?? null,
+    eps: details.eps ?? null,
+    ebitda: details.ebitda ?? null,
+    epsPositive: details.epsPositive ?? null,
+    ebitdaPositive: details.ebitdaPositive ?? null,
+    peAvailable: details.peAvailable ?? null,
+    latestPrice: quote?.latestPrice ?? details.latestPrice ?? null,
+    priceTimestamp: quote?.priceTimestamp ?? details.priceTimestamp ?? new Date().toISOString(),
+    detailSource: details.source || null,
+    quoteSource: quote?.source || null
+  };
+}
+
+async function fillSectorIfMissing(ticker, details, providerSeed = 'fmp', errors = {}) {
+  if (details.sector) {
+    return details;
+  }
+
+  const profileProviders = getConfiguredProviders(
+    'PRIMARY_PROFILE_PROVIDER',
+    'FALLBACK_PROFILE_PROVIDERS',
+    providerSeed
+  );
+
+  for (const provider of profileProviders) {
+    try {
+      const profileData = await openbb.getProfile(ticker, provider);
+      providerHealth.recordSuccess(provider);
+      if (profileData && profileData.sector) {
+        return {
+          ...details,
+          sector: profileData.sector
+        };
+      }
+    } catch (error) {
+      providerHealth.recordFailure(provider, error.message);
+      errors[`profile_${provider}`] = error.message;
+      console.warn(`⚠️ ${provider} failed for profile: ${error.message}`);
+    }
+  }
+
+  return details;
+}
+
+async function getStockDetails(ticker, options = {}) {
+  const cacheKey = `stock_details_${ticker}`;
+  const cached = options.forceRefresh ? null : getCached(cacheKey);
   if (cached) {
-    console.log(`✅ Cache hit for ${ticker}`);
     return cached;
   }
 
-  console.log(`🔄 Fetching ${ticker} via OpenBB (fundamentals + price)...`);
+  console.log(`🔄 Fetching stock details for ${ticker}...`);
 
-  let fundamentalsData = null;
-  let quoteData = null;
+  let details = null;
+  let winningProvider = null;
   const errors = {};
 
-  // STEP 1: Fetch fundamentals with provider fallback
   const fundamentalsProviders = getConfiguredProviders(
     'PRIMARY_FUNDAMENTALS_PROVIDER',
     'FALLBACK_PROVIDERS'
   );
+
   for (const provider of fundamentalsProviders) {
     try {
-      fundamentalsData = await openbb.getFundamentals(ticker, provider);
+      const fundamentalsData = await openbb.getFundamentals(ticker, provider);
       providerHealth.recordSuccess(provider);
-      console.log(`✅ Fundamentals fetched from ${provider}`);
-      break; // Success, exit loop
+      details = normalizeOpenbbFundamentals(fundamentalsData, ticker);
+      winningProvider = provider;
+      console.log(`✅ Details fetched from ${provider}`);
+      break;
     } catch (error) {
       providerHealth.recordFailure(provider, error.message);
       errors[`fundamentals_${provider}`] = error.message;
@@ -80,23 +144,73 @@ async function getFundamentals(ticker) {
     }
   }
 
-  // Check if we got fundamentals (required for classification)
-  if (!fundamentalsData) {
-    throw new Error(`Failed to fetch fundamentals for ${ticker} from all providers (${fundamentalsProviders.join(', ')}). Errors: ${JSON.stringify(errors)}`);
+  if (!details) {
+    try {
+      const yahooDetails = await yahooFinance.getFundamentals(ticker);
+      providerHealth.recordSuccess('yahoo');
+      details = {
+        ...yahooDetails,
+        source: 'yahoo'
+      };
+      winningProvider = 'yahoo';
+      console.log('✅ Details fetched from direct Yahoo fallback');
+    } catch (error) {
+      providerHealth.recordFailure('yahoo', error.message);
+      errors.fundamentals_yahoo = error.message;
+      console.warn(`⚠️ direct Yahoo failed for fundamentals: ${error.message}`);
+    }
   }
 
-  // STEP 2: Fetch price with provider fallback (ALWAYS attempt, even if fundamentals succeeded)
-  const priceProviders = getConfiguredProviders(
+  if (!details) {
+    throw new Error(
+      `Failed to fetch stock details for ${ticker} from all providers. Errors: ${JSON.stringify(errors)}`
+    );
+  }
+
+  const withSector = await fillSectorIfMissing(ticker, details, winningProvider || 'fmp', errors);
+  const result = {
+    ...withSector,
+    source: withSector.source || winningProvider || 'unknown'
+  };
+
+  setCache(cacheKey, result, config.cacheTTL);
+  return result;
+}
+
+async function getStockQuote(ticker, options = {}) {
+  const cacheKey = `stock_quote_${ticker}`;
+  const cached = options.forceRefresh ? null : getCached(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  console.log(`🔄 Fetching quote for ${ticker}...`);
+
+  const errors = {};
+  const quoteProviders = getConfiguredProviders(
     'PRIMARY_QUOTE_PROVIDER',
     'FALLBACK_QUOTE_PROVIDERS',
-    fundamentalsProviders[0] || 'fmp'
+    process.env.PRIMARY_FUNDAMENTALS_PROVIDER || 'fmp'
   );
-  for (const provider of priceProviders) {
+
+  for (const provider of quoteProviders) {
     try {
-      quoteData = await openbb.getQuote(ticker, provider);
+      const quoteData = await openbb.getQuote(ticker, provider);
       providerHealth.recordSuccess(provider);
-      console.log(`✅ Price fetched from ${provider}: $${quoteData.price}`);
-      break; // Success, exit loop
+
+      if (!isPresent(quoteData?.price)) {
+        throw new Error('Provider returned no price');
+      }
+
+      const result = {
+        ticker,
+        latestPrice: quoteData.price,
+        priceTimestamp: quoteData.timestamp || new Date().toISOString(),
+        source: provider
+      };
+
+      setCache(cacheKey, result, config.cacheTTL);
+      return result;
     } catch (error) {
       providerHealth.recordFailure(provider, error.message);
       errors[`quote_${provider}`] = error.message;
@@ -104,103 +218,44 @@ async function getFundamentals(ticker) {
     }
   }
 
-  // Warn if price is missing (but allow the operation to continue)
-  if (!quoteData || !quoteData.price) {
-    console.warn(`⚠️ Price unavailable for ${ticker} - stock will have null price`);
-  }
-
-  // STEP 3: Fetch sector from profile if missing from fundamentals
-  if (!fundamentalsData.sector) {
-    console.log(`🔄 Fetching sector for ${ticker} from profile...`);
-    const profileProviders = getConfiguredProviders(
-      'PRIMARY_PROFILE_PROVIDER',
-      'FALLBACK_PROFILE_PROVIDERS',
-      priceProviders[0] || fundamentalsProviders[0] || 'fmp'
-    );
-
-    for (const provider of profileProviders) {
-      try {
-        const profileData = await openbb.getProfile(ticker, provider);
-        providerHealth.recordSuccess(provider);
-
-        if (profileData && profileData.sector) {
-          fundamentalsData.sector = profileData.sector;
-          console.log(`✅ Sector fetched from ${provider}: ${profileData.sector}`);
-          break;
-        }
-      } catch (error) {
-        providerHealth.recordFailure(provider, error.message);
-        errors[`profile_${provider}`] = error.message;
-        console.warn(`⚠️ ${provider} failed for profile: ${error.message}`);
-      }
+  try {
+    const yahooQuote = await yahoo.getQuote(ticker);
+    if (!yahooQuote || !isPresent(yahooQuote.latestPrice)) {
+      throw new Error('Yahoo returned no price');
     }
+
+    providerHealth.recordSuccess('yahoo');
+    const result = {
+      ...yahooQuote,
+      source: 'yahoo'
+    };
+    setCache(cacheKey, result, config.cacheTTL);
+    return result;
+  } catch (error) {
+    providerHealth.recordFailure('yahoo', error.message);
+    errors.quote_yahoo = error.message;
   }
 
-  // Merge fundamentals and quote data
-  const result = normalizeFundamentals(fundamentalsData, quoteData, ticker);
-
-  // ✅ PRESERVED: Cache for 24 hours
-  setCache(cacheKey, result, config.cacheTTL);
-
-  console.log(`✅ ${ticker} complete (fundamentals ${fundamentalsData ? '✓' : '✗'}, price ${quoteData?.price ? '✓' : '✗'})`);
-  return result;
+  throw new Error(
+    `Failed to fetch quote for ${ticker} from all providers. Errors: ${JSON.stringify(errors)}`
+  );
 }
 
-/**
- * ⚠️ IMPORTANT: OpenBB Platform Data Normalization
- *
- * OpenBB Platform v4.5.0+ normalizes ALL providers to return
- * growth metrics as decimals (0.08 = 8% growth), regardless of source.
- *
- * The format detection code below is defensive programming for edge cases.
- *
- * @param {Object} openbbData - Fundamentals from obb.equity.fundamental.metrics()
- * @param {Object} quoteData - Price data from obb.equity.price.quote()
- * @param {string} ticker - Stock symbol
- * @returns {Object} - Normalized data matching existing schema
- */
-function normalizeFundamentals(openbbData, quoteData, ticker) {
-  /**
-   * Detect if growth rates are decimals or percentages
-   * Heuristic: If value is between -1.5 and 1.5, it's likely a decimal (e.g., 0.08 = 8%)
-   * If > 1.5, it's already a percentage (e.g., 8.0 = 8%)
-   */
-  const isDecimalFormat = (value) => {
-    return value !== null && value !== undefined && Math.abs(value) < 1.5;
-  };
+async function getFundamentals(ticker, options = {}) {
+  const details = await getStockDetails(ticker, options);
 
-  // Convert decimals to percentages for compatibility with existing classification system
-  const convertToPercentage = (value) => {
-    if (value === null || value === undefined) return null;
-    return isDecimalFormat(value) ? value * 100 : value;
-  };
+  let quote = null;
+  try {
+    quote = await getStockQuote(ticker, options);
+  } catch (error) {
+    console.warn(`⚠️ Quote unavailable for ${ticker}: ${error.message}`);
+  }
 
-  // Handle negative debt (net cash position)
-  const debtEbitda = openbbData.debt_to_ebitda !== null && openbbData.debt_to_ebitda < 0
-    ? 0
-    : openbbData.debt_to_ebitda;
-
-  // Transform OpenBB data format to match existing schema
-  return {
-    ticker,
-    companyName: openbbData.company_name || ticker,
-    sector: openbbData.sector,
-    // ✅ Smart conversion: only multiply by 100 if format is decimal
-    revenueGrowth: convertToPercentage(openbbData.revenue_growth),
-    epsGrowth: convertToPercentage(openbbData.eps_growth),
-    peForward: openbbData.pe_forward,
-    debtEbitda: debtEbitda,
-    // ✅ NEW: Pass raw eps and ebitda values for classification
-    eps: openbbData.eps,
-    ebitda: openbbData.ebitda,
-    // Flags for classification
-    epsPositive: openbbData.eps !== null && openbbData.eps > 0,
-    ebitdaPositive: openbbData.ebitda !== null && openbbData.ebitda > 0,
-    peAvailable: openbbData.pe_forward !== null && openbbData.pe_forward > 0,
-    // ✅ CRITICAL FIX: Price comes from separate quote endpoint, not fundamentals
-    latestPrice: quoteData?.price || null,
-    priceTimestamp: quoteData?.timestamp || new Date().toISOString()
-  };
+  return mergeFundamentals(details, quote, ticker);
 }
 
-module.exports = { getFundamentals };
+module.exports = {
+  getFundamentals,
+  getStockDetails,
+  getStockQuote
+};

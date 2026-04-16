@@ -1,10 +1,31 @@
 import React from 'react';
 import { theme } from '../config/theme';
-import { formatDate } from '../utils/formatting';
+import { formatDate, formatDateTime } from '../utils/formatting';
 import ScoreGauge from './ScoreGauge';
 import IndicatorGrid from './IndicatorGrid';
 import AllocationChart from './AllocationChart';
 import InterpretationPanel from './InterpretationPanel';
+
+function hasMacroWarning(refresh) {
+  return ['warning', 'failed', 'never'].includes(refresh?.status || 'never');
+}
+
+function MacroRefreshNotice({ refresh }) {
+  if (!refresh) {
+    return null;
+  }
+
+  const statusClass = hasMacroWarning(refresh) ? 'warning' : 'success';
+
+  return (
+    <div className={`macro-refresh-notice ${statusClass}`}>
+      <strong>Macro freshness:</strong> {refresh.message || refresh.status}
+      {refresh.lastRefreshedAt && (
+        <span> Last attempt: {formatDateTime(refresh.lastRefreshedAt)}.</span>
+      )}
+    </div>
+  );
+}
 
 function RegimeDisplay({ regime, loading, error }) {
   if (loading) {
@@ -17,7 +38,20 @@ function RegimeDisplay({ regime, loading, error }) {
 
   if (!regime) return null;
 
-  // ✅ FPS/GPS Enhancement: Check if we have enhanced regime data
+  if (regime.available === false) {
+    return (
+      <div className="regime-display-container">
+        <div className="regime-banner error">
+          <div className="regime-main">
+            <h2 className="regime-name">Macro Regime Unavailable</h2>
+            <p className="regime-description">{regime.error || 'Macro data is unavailable right now.'}</p>
+          </div>
+          <MacroRefreshNotice refresh={regime.refresh} />
+        </div>
+      </div>
+    );
+  }
+
   const isEnhanced = regime.scores && regime.allocation && regime.breakdown;
   const { regime: name, description, recommendation, metrics } = regime;
 
@@ -30,7 +64,6 @@ function RegimeDisplay({ regime, loading, error }) {
 
   return (
     <div className="regime-display-container">
-      {/* ✅ Basic Regime Banner (unchanged) */}
       <div
         className="regime-banner"
         style={{ borderLeftColor: regimeColors[name] }}
@@ -68,10 +101,10 @@ function RegimeDisplay({ regime, loading, error }) {
         </div>
       </div>
 
-      {/* ✅ FPS/GPS Enhanced Components (only if enhanced data available) */}
+      <MacroRefreshNotice refresh={regime.refresh} />
+
       {isEnhanced && (
         <>
-          {/* FPS and GPS Score Gauges */}
           <div className="score-gauges-container">
             <ScoreGauge
               label="Fed Pressure Score (FPS)"
@@ -85,16 +118,13 @@ function RegimeDisplay({ regime, loading, error }) {
             />
           </div>
 
-          {/* Allocation Chart */}
           <AllocationChart
             allocation={regime.allocation}
             allocationSteps={regime.allocation_steps}
           />
 
-          {/* Interpretation Messages */}
           <InterpretationPanel messages={regime.interpretation} />
 
-          {/* Indicator Grid */}
           <IndicatorGrid
             fpsBreakdown={regime.breakdown.fps}
             gpsBreakdown={regime.breakdown.gps}
