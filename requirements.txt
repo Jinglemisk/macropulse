@@ -1,0 +1,6 @@
+openbb==4.5.0
+yfinance==0.2.58
+curl_cffi==0.13.0
+certifi==2025.11.12
+numpy==2.3.5
+pandas==2.3.3
