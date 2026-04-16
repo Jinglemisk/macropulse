@@ -3,6 +3,26 @@ const config = require('../config');
 const { getCached, setCache } = require('./cache');
 const providerHealth = require('../utils/providerHealth');
 
+function parseProviders(primaryProvider, fallbackProviders) {
+  const normalized = [primaryProvider, ...fallbackProviders]
+    .flat()
+    .filter(Boolean)
+    .map(provider => provider.trim().toLowerCase())
+    .filter(Boolean);
+
+  return normalized.filter((provider, index) => normalized.indexOf(provider) === index);
+}
+
+function getConfiguredProviders(primaryEnvKey, fallbackEnvKey, defaultPrimary = 'fmp') {
+  const primary = process.env[primaryEnvKey] || defaultPrimary;
+  const fallbacks = (process.env[fallbackEnvKey] || 'yfinance,intrinio')
+    .split(',')
+    .map(provider => provider.trim())
+    .filter(Boolean);
+
+  return providerHealth.sortProvidersByHealth(parseProviders(primary, fallbacks));
+}
+
 /**
  * ⚠️ MIGRATED TO OPENBB PLATFORM
  *
@@ -38,16 +58,15 @@ async function getFundamentals(ticker) {
 
   console.log(`🔄 Fetching ${ticker} via OpenBB (fundamentals + price)...`);
 
-  // ✅ NEW: Different provider orders for different data types
-  // yfinance for fundamentals (FMP returning NULL data), yfinance for price (free, fast)
-  const fundamentalsProviders = ['yfinance', 'fmp', 'intrinio'];
-  const priceProviders = ['yfinance', 'fmp', 'intrinio'];
-
   let fundamentalsData = null;
   let quoteData = null;
   const errors = {};
 
   // STEP 1: Fetch fundamentals with provider fallback
+  const fundamentalsProviders = getConfiguredProviders(
+    'PRIMARY_FUNDAMENTALS_PROVIDER',
+    'FALLBACK_PROVIDERS'
+  );
   for (const provider of fundamentalsProviders) {
     try {
       fundamentalsData = await openbb.getFundamentals(ticker, provider);
@@ -67,6 +86,11 @@ async function getFundamentals(ticker) {
   }
 
   // STEP 2: Fetch price with provider fallback (ALWAYS attempt, even if fundamentals succeeded)
+  const priceProviders = getConfiguredProviders(
+    'PRIMARY_QUOTE_PROVIDER',
+    'FALLBACK_QUOTE_PROVIDERS',
+    fundamentalsProviders[0] || 'fmp'
+  );
   for (const provider of priceProviders) {
     try {
       quoteData = await openbb.getQuote(ticker, provider);
@@ -88,15 +112,27 @@ async function getFundamentals(ticker) {
   // STEP 3: Fetch sector from profile if missing from fundamentals
   if (!fundamentalsData.sector) {
     console.log(`🔄 Fetching sector for ${ticker} from profile...`);
-    try {
-      const profileData = await openbb.getProfile(ticker, priceProviders[0]); // Use same provider priority
-      if (profileData && profileData.sector) {
-        fundamentalsData.sector = profileData.sector;
-        console.log(`✅ Sector fetched: ${profileData.sector}`);
+    const profileProviders = getConfiguredProviders(
+      'PRIMARY_PROFILE_PROVIDER',
+      'FALLBACK_PROFILE_PROVIDERS',
+      priceProviders[0] || fundamentalsProviders[0] || 'fmp'
+    );
+
+    for (const provider of profileProviders) {
+      try {
+        const profileData = await openbb.getProfile(ticker, provider);
+        providerHealth.recordSuccess(provider);
+
+        if (profileData && profileData.sector) {
+          fundamentalsData.sector = profileData.sector;
+          console.log(`✅ Sector fetched from ${provider}: ${profileData.sector}`);
+          break;
+        }
+      } catch (error) {
+        providerHealth.recordFailure(provider, error.message);
+        errors[`profile_${provider}`] = error.message;
+        console.warn(`⚠️ ${provider} failed for profile: ${error.message}`);
       }
-    } catch (error) {
-      console.warn(`⚠️ Sector fetch failed: ${error.message}`);
-      // Continue anyway, sector will remain null
     }
   }
 
