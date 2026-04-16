@@ -13,8 +13,9 @@ console.log('Fetching macro data from FRED...\n');
 const days = process.argv[2] ? parseInt(process.argv[2]) : 365;
 
 updateMacroData(days)
-  .then(count => {
-    console.log(`\n✓ Successfully fetched ${count} days of macro data`);
+  .then(result => {
+    console.log(`\n✓ Successfully processed ${result.updatedDays} days of macro data`);
+    console.log(`✓ Macro status: ${result.status}`);
     console.log('✓ Database is ready');
     console.log('\nYou can now start the server with: npm run dev\n');
     process.exit(0);
