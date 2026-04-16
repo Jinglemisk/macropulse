@@ -105,6 +105,7 @@ Notes:
 - `FRED_API_KEY` and `OPENBB_FRED_API_KEY` should usually be the same value.
 - The backend shells out to `PYTHON_PATH`, so it must point to the Python environment where `openbb` is installed.
 - Provider order is configurable and can differ for fundamentals, quotes, and profiles.
+- If all OpenBB fundamentals providers fail, the backend falls back to a direct Yahoo Finance fetch before giving up.
 
 ## Running the App
 
@@ -213,6 +214,7 @@ macropulse/
 
 - The app tries providers in configured order with fallback.
 - Keep `fmp` as the primary provider unless you have a reason to change it.
+- If OpenBB's `yfinance` adapter is broken or a provider blocks a ticker, the backend will make one last direct Yahoo Finance attempt for fundamentals.
 - Review backend logs for provider-specific errors.
 
 **No regime data available**

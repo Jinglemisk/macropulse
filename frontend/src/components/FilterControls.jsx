@@ -6,6 +6,16 @@ function FilterControls({ filters, setFilters, stocks }) {
 
   return (
     <div className="filter-controls">
+      <div className="filter-group filter-search">
+        <label>Search</label>
+        <input
+          type="search"
+          value={filters.search}
+          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+          placeholder="Ticker, company, sector"
+        />
+      </div>
+
       <div className="filter-group">
         <label>Class</label>
         <select

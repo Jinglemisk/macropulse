@@ -9,6 +9,7 @@
 const providerStats = {
   fmp: { successes: 0, failures: 0, lastSuccess: null, lastFailure: null },
   yfinance: { successes: 0, failures: 0, lastSuccess: null, lastFailure: null },
+  yahoo: { successes: 0, failures: 0, lastSuccess: null, lastFailure: null },
   intrinio: { successes: 0, failures: 0, lastSuccess: null, lastFailure: null },
   fred: { successes: 0, failures: 0, lastSuccess: null, lastFailure: null }
 };
