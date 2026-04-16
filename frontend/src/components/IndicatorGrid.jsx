@@ -1,173 +1,106 @@
-/**
- * ✅ FPS/GPS Enhancement: Indicator Grid Component
- *
- * Displays all 13 macro indicators with current values,
- * classifications, and contributions to FPS/GPS scores
- */
-
 import React from 'react';
-import '../styles/IndicatorGrid.css';
-import SectionTitle from './SectionTitle';
+import { cx } from '../utils/classes';
 
-function IndicatorGrid({ fpsBreakdown, gpsBreakdown }) {
-  // Format indicator name for display
-  const formatIndicatorName = (name) => {
-    const names = {
-      unemployment: 'Unemployment Rate',
-      jobless_claims: 'Jobless Claims',
-      nonfarm_payrolls: 'Nonfarm Payrolls',
-      cpi_yoy: 'CPI (YoY)',
-      core_cpi_yoy: 'Core CPI (YoY)',
-      ppi: 'PPI (MoM)',
-      ism_manufacturing: 'ISM Manufacturing',
-      ism_services: 'ISM Services',
-      chicago_pmi: 'Chicago PMI',
-      consumer_confidence: 'Consumer Confidence'
-    };
-    return names[name] || name;
-  };
+const NAMES = {
+  unemployment: 'Unemployment',
+  jobless_claims: 'Jobless Claims',
+  nonfarm_payrolls: 'Nonfarm Payrolls',
+  cpi_yoy: 'CPI (YoY)',
+  core_cpi_yoy: 'Core CPI (YoY)',
+  ppi: 'PPI (MoM)',
+  ism_manufacturing: 'ISM Manufacturing',
+  ism_services: 'ISM Services',
+  chicago_pmi: 'Chicago PMI',
+  consumer_confidence: 'Consumer Confidence'
+};
 
-  // Format value based on indicator type
-  const formatValue = (indicator, value) => {
-    if (value === null || value === undefined) return 'N/A';
+function fmt(indicator, value) {
+  if (value == null) return '—';
+  if (indicator?.includes('yoy') || indicator === 'unemployment' || indicator === 'ppi') {
+    return `${value.toFixed(1)}%`;
+  }
+  if (indicator === 'jobless_claims' || indicator === 'nonfarm_payrolls') {
+    return `${(value / 1000).toFixed(0)}k`;
+  }
+  return value.toFixed(1);
+}
 
-    // Percentages
-    if (indicator.includes('yoy') || indicator.includes('ppi') || indicator === 'unemployment') {
-      return `${value.toFixed(1)}%`;
-    }
+function classBadge(cls) {
+  switch (cls) {
+    case 'High': return 'text-down border-down/40 bg-down/10';
+    case 'Low':  return 'text-up   border-up/40   bg-up/10';
+    case 'Normal': return 'text-muted border-line bg-surf';
+    default: return 'text-muted border-line bg-surf';
+  }
+}
 
-    // Large numbers (jobless claims, nonfarm payrolls)
-    if (indicator === 'jobless_claims' || indicator === 'nonfarm_payrolls') {
-      return (value / 1000).toFixed(0) + 'k';
-    }
+function scoreColor(s) {
+  if (s == null) return 'text-muted';
+  if (s > 0) return 'text-warn';
+  if (s < 0) return 'text-up';
+  return 'text-muted';
+}
 
-    // Indexes (ISM, confidence)
-    return value.toFixed(1);
-  };
-
-  // Get classification badge color
-  const getClassificationColor = (classification) => {
-    switch (classification) {
-      case 'High':
-        return '#ef4444';
-      case 'Low':
-        return '#10b981';
-      case 'Normal':
-        return '#64748b';
-      default:
-        return '#6b7280';
-    }
-  };
-
-  // Combine FPS and GPS breakdowns
-  const allIndicators = new Map();
-
-  fpsBreakdown.forEach(item => {
-    allIndicators.set(item.indicator, {
-      ...item,
-      fps_weight: item.weight,
-      fps_score: item.score,
-      fps_contribution: item.contribution
-    });
-  });
-
-  gpsBreakdown.forEach(item => {
-    const existing = allIndicators.get(item.indicator) || {};
-    allIndicators.set(item.indicator, {
-      ...existing,
-      ...item,
-      gps_weight: item.weight,
-      gps_score: item.score,
-      gps_contribution: item.contribution
-    });
-  });
-
-  const indicators = Array.from(allIndicators.values());
+function IndicatorGrid({ fpsBreakdown = [], gpsBreakdown = [] }) {
+  const map = new Map();
+  fpsBreakdown.forEach((it) => map.set(it.indicator, { ...it, fps_score: it.score, fps_weight: it.weight }));
+  gpsBreakdown.forEach((it) => map.set(it.indicator, { ...(map.get(it.indicator) || {}), ...it, gps_score: it.score, gps_weight: it.weight }));
+  const rows = Array.from(map.values());
 
   return (
-    <div id="macro" className="indicator-grid" style={{ scrollMarginTop: '20px' }}>
-      <SectionTitle
-        title="Macro Indicators"
-        description="Live economic data including unemployment, CPI, payrolls, and consumer confidence. Each indicator is classified as High/Normal/Low to compute FPS and GPS scores."
-        tag="h3"
-        className="grid-title-wrapper"
-      />
-
-      <div className="grid-container">
-        <table className="indicator-table">
+    <div className="font-mono">
+      <div className="overflow-x-auto -mx-4 md:mx-0">
+        <table className="w-full text-[12px]">
           <thead>
-            <tr>
-              <th>Indicator</th>
-              <th>Value</th>
-              <th>Classification</th>
-              <th>FPS</th>
-              <th>GPS</th>
+            <tr className="text-muted smallcaps-tight border-y border-line">
+              <th className="text-left  font-normal py-1.5 px-2">INDICATOR</th>
+              <th className="text-right font-normal py-1.5 px-2">VALUE</th>
+              <th className="text-left  font-normal py-1.5 px-2">CLASS</th>
+              <th className="text-right font-normal py-1.5 px-2">FPS</th>
+              <th className="text-right font-normal py-1.5 px-2">GPS</th>
             </tr>
           </thead>
           <tbody>
-            {indicators.map((item, index) => (
-              <tr key={index} className="indicator-row">
-                <td className="indicator-name">
-                  {formatIndicatorName(item.indicator)}
-                </td>
-                <td className="indicator-value">
-                  {formatValue(item.indicator, item.value)}
-                </td>
-                <td className="indicator-classification">
-                  <span
-                    className="classification-badge"
-                    style={{ backgroundColor: getClassificationColor(item.classification) }}
-                  >
-                    {item.classification || 'Unknown'}
-                  </span>
-                </td>
-                <td className="indicator-score">
-                  {item.fps_score !== null && item.fps_score !== undefined ? (
-                    <div className="score-cell">
-                      <span className={`score-value ${item.fps_score > 0 ? 'positive' : item.fps_score < 0 ? 'negative' : 'neutral'}`}>
-                        {item.fps_score > 0 ? '+' : ''}{item.fps_score}
-                      </span>
-                      <span className="score-weight">
-                        (×{item.fps_weight})
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="score-na">—</span>
+            {rows.map((row, i) => (
+              <tr key={i} className="border-b border-line/40 hover:bg-surf/40">
+                <td className="py-1 px-2 text-text">{NAMES[row.indicator] || row.indicator}</td>
+                <td className="py-1 px-2 text-right tabular text-text">{fmt(row.indicator, row.value)}</td>
+                <td className="py-1 px-2">
+                  {row.classification && (
+                    <span className={cx('px-1.5 py-0.5 border smallcaps-tight inline-block', classBadge(row.classification))}>
+                      {row.classification.toUpperCase()}
+                    </span>
                   )}
                 </td>
-                <td className="indicator-score">
-                  {item.gps_score !== null && item.gps_score !== undefined ? (
-                    <div className="score-cell">
-                      <span className={`score-value ${item.gps_score > 0 ? 'positive' : item.gps_score < 0 ? 'negative' : 'neutral'}`}>
-                        {item.gps_score > 0 ? '+' : ''}{item.gps_score}
-                      </span>
-                      <span className="score-weight">
-                        (×{item.gps_weight})
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="score-na">—</span>
-                  )}
+                <td className="py-1 px-2 text-right tabular">
+                  {row.fps_score != null ? (
+                    <span className={scoreColor(row.fps_score)}>
+                      {row.fps_score > 0 ? '+' : ''}{row.fps_score}
+                      <span className="text-muted text-[10px] ml-1">×{row.fps_weight}</span>
+                    </span>
+                  ) : <span className="text-muted">—</span>}
+                </td>
+                <td className="py-1 px-2 text-right tabular">
+                  {row.gps_score != null ? (
+                    <span className={scoreColor(row.gps_score)}>
+                      {row.gps_score > 0 ? '+' : ''}{row.gps_score}
+                      <span className="text-muted text-[10px] ml-1">×{row.gps_weight}</span>
+                    </span>
+                  ) : <span className="text-muted">—</span>}
                 </td>
               </tr>
             ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={5} className="py-3 text-center text-muted">No indicator data</td></tr>
+            )}
           </tbody>
         </table>
+      </div>
 
-        <div className="grid-legend">
-          <div className="legend-item">
-            <span className="legend-badge" style={{ backgroundColor: '#10b981' }}>Low</span>
-            <span className="legend-text">Below threshold</span>
-          </div>
-          <div className="legend-item">
-            <span className="legend-badge" style={{ backgroundColor: '#64748b' }}>Normal</span>
-            <span className="legend-text">Within range</span>
-          </div>
-          <div className="legend-item">
-            <span className="legend-badge" style={{ backgroundColor: '#ef4444' }}>High</span>
-            <span className="legend-text">Above threshold</span>
-          </div>
-        </div>
+      <div className="flex flex-wrap gap-3 text-[11px] text-muted mt-3 pt-2 border-t border-line/40">
+        <span><span className="text-up">●</span> Low — below threshold</span>
+        <span><span className="text-muted">●</span> Normal — within range</span>
+        <span><span className="text-down">●</span> High — above threshold</span>
       </div>
     </div>
   );

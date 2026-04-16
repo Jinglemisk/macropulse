@@ -1,84 +1,129 @@
-import React from 'react';
+import React, { useId } from 'react';
+import { cx } from '../utils/classes';
 
-function FilterControls({ filters, setFilters, stocks }) {
-  // Get unique sectors
-  const sectors = [...new Set(stocks.map(s => s.sector).filter(Boolean))].sort();
+const baseField = cx(
+  'h-7 px-2 bg-bg border border-line text-text font-mono text-[12px]',
+  'focus:border-accent focus:outline-none placeholder:text-muted/60'
+);
+
+function FilterControls({ filters, setFilters, stocks, searchInputRef }) {
+  const sectors = [...new Set(stocks.map((s) => s.sector).filter(Boolean))].sort();
+  const baseId = useId();
+
+  const update = (patch) => setFilters({ ...filters, ...patch });
+  const reset = () => setFilters({
+    search: '', class: 'all', confidence: 'all', sector: 'all',
+    sortBy: 'ticker', sortOrder: 'asc'
+  });
+
+  const isDefault =
+    !filters.search && filters.class === 'all' && filters.confidence === 'all' &&
+    filters.sector === 'all' && filters.sortBy === 'ticker' && filters.sortOrder === 'asc';
 
   return (
-    <div className="filter-controls">
-      <div className="filter-group filter-search">
-        <label>Search</label>
+    <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+      <Field id={`${baseId}-search`} label="SEARCH" wide>
         <input
+          ref={searchInputRef}
+          id={`${baseId}-search`}
           type="search"
+          placeholder="ticker · company · sector  ( / )"
           value={filters.search}
-          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-          placeholder="Ticker, company, sector"
+          onChange={(e) => update({ search: e.target.value })}
+          className={cx(baseField, 'min-w-[260px]')}
         />
-      </div>
+      </Field>
 
-      <div className="filter-group">
-        <label>Class</label>
+      <Field id={`${baseId}-class`} label="CLASS">
         <select
+          id={`${baseId}-class`}
           value={filters.class}
-          onChange={(e) => setFilters({ ...filters, class: e.target.value })}
+          onChange={(e) => update({ class: e.target.value })}
+          className={baseField}
         >
-          <option value="all">All Classes</option>
-          <option value="A">Class A</option>
-          <option value="B">Class B</option>
-          <option value="C">Class C</option>
-          <option value="D">Class D</option>
+          <option value="all">·  ALL</option>
+          <option value="A">A · Defensive</option>
+          <option value="B">B · Steady</option>
+          <option value="C">C · Growth</option>
+          <option value="D">D · Hyper</option>
         </select>
-      </div>
+      </Field>
 
-      <div className="filter-group">
-        <label>Confidence</label>
+      <Field id={`${baseId}-conf`} label="CONFIDENCE">
         <select
+          id={`${baseId}-conf`}
           value={filters.confidence}
-          onChange={(e) => setFilters({ ...filters, confidence: e.target.value })}
+          onChange={(e) => update({ confidence: e.target.value })}
+          className={baseField}
         >
-          <option value="all">All</option>
-          <option value="high">High (&gt;40%)</option>
-          <option value="medium">Medium (20-40%)</option>
-          <option value="low">Low (&lt;20%)</option>
+          <option value="all">·  ALL</option>
+          <option value="high">HIGH  &gt;40%</option>
+          <option value="medium">MED 20–40%</option>
+          <option value="low">LOW  &lt;20%</option>
         </select>
-      </div>
+      </Field>
 
-      <div className="filter-group">
-        <label>Sector</label>
+      <Field id={`${baseId}-sector`} label="SECTOR">
         <select
+          id={`${baseId}-sector`}
           value={filters.sector}
-          onChange={(e) => setFilters({ ...filters, sector: e.target.value })}
+          onChange={(e) => update({ sector: e.target.value })}
+          className={baseField}
         >
-          <option value="all">All Sectors</option>
-          {sectors.map(sector => (
-            <option key={sector} value={sector}>{sector}</option>
+          <option value="all">·  ALL</option>
+          {sectors.map((s) => (
+            <option key={s} value={s}>{s}</option>
           ))}
         </select>
-      </div>
+      </Field>
 
-      <div className="filter-group">
-        <label>Sort By</label>
+      <Field id={`${baseId}-sortBy`} label="SORT">
         <select
+          id={`${baseId}-sortBy`}
           value={filters.sortBy}
-          onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+          onChange={(e) => update({ sortBy: e.target.value })}
+          className={baseField}
         >
-          <option value="ticker">Ticker</option>
-          <option value="class">Class</option>
-          <option value="confidence">Confidence</option>
+          <option value="ticker">TICKER</option>
+          <option value="class">CLASS</option>
+          <option value="confidence">CONF</option>
+          <option value="price">PRICE</option>
+          <option value="sector">SECTOR</option>
         </select>
-      </div>
+      </Field>
 
-      <div className="filter-group">
-        <label>Order</label>
-        <select
-          value={filters.sortOrder}
-          onChange={(e) => setFilters({ ...filters, sortOrder: e.target.value })}
+      <button
+        type="button"
+        onClick={() =>
+          update({ sortOrder: filters.sortOrder === 'asc' ? 'desc' : 'asc' })
+        }
+        className={cx(baseField, 'inline-flex items-center justify-center px-2 hover:border-accent/60')}
+        title={`Order: ${filters.sortOrder.toUpperCase()}`}
+      >
+        {filters.sortOrder === 'asc' ? '▲ ASC' : '▼ DESC'}
+      </button>
+
+      <div className="flex-1" />
+
+      {!isDefault && (
+        <button
+          type="button"
+          onClick={reset}
+          className="h-7 px-2 text-muted hover:text-down border border-transparent hover:border-down/40 smallcaps-tight"
         >
-          <option value="asc">Ascending</option>
-          <option value="desc">Descending</option>
-        </select>
-      </div>
+          [ RESET ]
+        </button>
+      )}
     </div>
+  );
+}
+
+function Field({ id, label, wide, children }) {
+  return (
+    <label htmlFor={id} className={cx('flex flex-col gap-1', wide && 'flex-1 min-w-[260px]')}>
+      <span className="smallcaps-tight text-muted">{label}</span>
+      {children}
+    </label>
   );
 }
 

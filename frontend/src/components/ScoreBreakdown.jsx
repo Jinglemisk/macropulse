@@ -1,30 +1,33 @@
 import React from 'react';
-import { theme } from '../config/theme';
+import { cx, classBg, classText } from '../utils/classes';
 
 function ScoreBreakdown({ scores, finalClass }) {
-  const classColors = theme.colors.classes;
-
+  if (!scores) return null;
   return (
-    <div className="score-breakdown">
-      <h4>Classification Scores</h4>
-      {['A', 'B', 'C', 'D'].map(cls => (
-        <div key={cls} className="score-row">
-          <span className="class-label" style={{ color: classColors[cls] }}>
-            {cls}
-          </span>
-          <div className="score-bar-container">
-            <div
-              className="score-bar"
-              style={{
-                width: `${scores[cls] * 100}%`,
-                backgroundColor: classColors[cls]
-              }}
-            />
-          </div>
-          <span className="score-value">{scores[cls].toFixed(2)}</span>
-          {cls === finalClass && <span className="selected-indicator">← Selected</span>}
-        </div>
-      ))}
+    <div className="font-mono text-[12px]">
+      <div className="smallcaps-tight text-muted mb-2">CLASSIFICATION SCORES</div>
+      <div className="space-y-1">
+        {['A', 'B', 'C', 'D'].map((cls) => {
+          const v = scores[cls] ?? 0;
+          const pct = Math.max(0, Math.min(100, v * 100));
+          const selected = cls === finalClass;
+          return (
+            <div key={cls} className="grid grid-cols-[24px_1fr_60px_70px] items-center gap-2">
+              <span className={cx('text-[14px] font-bold', classText[cls] || 'text-text')}>{cls}</span>
+              <div className="h-3 bg-surf border border-line/70 relative">
+                <div
+                  className={cx('absolute inset-y-0 left-0', classBg[cls] || 'bg-text', 'opacity-80')}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <span className="tabular text-text text-right">{v.toFixed(2)}</span>
+              {selected ? (
+                <span className="text-accent smallcaps-tight">◀ SELECTED</span>
+              ) : <span />}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

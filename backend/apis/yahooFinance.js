@@ -150,4 +150,30 @@ async function fetchStatsData(ticker) {
   }
 }
 
-module.exports = { getFundamentals };
+/**
+ * Fetch a recent daily-close price history from Yahoo's chart endpoint.
+ * Returns an array of finite numbers (most recent last) or [] on failure.
+ * Used to populate the holdings-table sparkline.
+ */
+async function getPriceHistory(ticker, { range = '1mo', interval = '1d' } = {}) {
+  const cacheKey = `yahoo_history_${ticker}_${range}_${interval}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${range}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const result = data?.chart?.result?.[0];
+    const closes = result?.indicators?.quote?.[0]?.close || [];
+    const cleaned = closes.filter((v) => typeof v === 'number' && Number.isFinite(v));
+    setCache(cacheKey, cleaned, config.cacheTTL);
+    return cleaned;
+  } catch (error) {
+    console.warn(`⚠️ Yahoo history failed for ${ticker}: ${error.message}`);
+    return [];
+  }
+}
+
+module.exports = { getFundamentals, getPriceHistory };
