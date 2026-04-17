@@ -120,6 +120,14 @@ function initializeTables() {
     )
   `);
 
+  // ── UI revamp: per-stock price history for sparklines ─────────────────
+  // Additive ALTER TABLE — column holds a JSON-encoded number[] of recent closes.
+  const fundamentalsColumns = db.prepare('PRAGMA table_info(fundamentals)').all().map(c => c.name);
+  if (!fundamentalsColumns.includes('price_history')) {
+    console.log('📊 Adding price_history column to fundamentals...');
+    db.exec('ALTER TABLE fundamentals ADD COLUMN price_history TEXT');
+  }
+
   // ✅ NEW (Phase 6): Add expanded macro indicators if they don't exist
   // Using ALTER TABLE for backwards compatibility
   const columns = db.prepare("PRAGMA table_info(macro_data)").all();

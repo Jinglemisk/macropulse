@@ -1,6 +1,7 @@
 const db = require('../database');
 const { MACRO_SERIES, updateMacroData } = require('../apis/fred');
 const { getStockQuote, getStockDetails } = require('../apis/fmp');
+const { getPriceHistory } = require('../apis/yahooFinance');
 const { clearExpiredCache } = require('../apis/cache');
 const { classifyStock } = require('./classifier');
 
@@ -96,22 +97,46 @@ function touchStock(ticker) {
   db.prepare('UPDATE stocks SET last_updated = ? WHERE ticker = ?').run(toIsoNow(), ticker);
 }
 
-function upsertQuoteData(ticker, quote) {
-  db.prepare(`
-    INSERT INTO fundamentals (
-      ticker, latest_price, price_timestamp, fetch_date
-    )
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(ticker) DO UPDATE SET
-      latest_price = excluded.latest_price,
-      price_timestamp = excluded.price_timestamp,
-      fetch_date = excluded.fetch_date
-  `).run(
-    ticker,
-    quote.latestPrice,
-    quote.priceTimestamp,
-    toIsoNow()
-  );
+function upsertQuoteData(ticker, quote, priceHistory) {
+  // Only overwrite price_history when the caller has fresh data; preserve the
+  // existing serialized array otherwise so a transient history fetch failure
+  // does not blank out the sparkline.
+  const writeHistory = Array.isArray(priceHistory) && priceHistory.length >= 2;
+  if (writeHistory) {
+    db.prepare(`
+      INSERT INTO fundamentals (
+        ticker, latest_price, price_timestamp, price_history, fetch_date
+      )
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(ticker) DO UPDATE SET
+        latest_price = excluded.latest_price,
+        price_timestamp = excluded.price_timestamp,
+        price_history = excluded.price_history,
+        fetch_date = excluded.fetch_date
+    `).run(
+      ticker,
+      quote.latestPrice,
+      quote.priceTimestamp,
+      serializeJson(priceHistory),
+      toIsoNow()
+    );
+  } else {
+    db.prepare(`
+      INSERT INTO fundamentals (
+        ticker, latest_price, price_timestamp, fetch_date
+      )
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(ticker) DO UPDATE SET
+        latest_price = excluded.latest_price,
+        price_timestamp = excluded.price_timestamp,
+        fetch_date = excluded.fetch_date
+    `).run(
+      ticker,
+      quote.latestPrice,
+      quote.priceTimestamp,
+      toIsoNow()
+    );
+  }
 }
 
 function upsertDetailData(ticker, details) {
@@ -283,7 +308,15 @@ async function refreshStockQuote(ticker) {
 
   try {
     const quote = await getStockQuote(ticker, { forceRefresh: true });
-    upsertQuoteData(ticker, quote);
+    // Best-effort 30-day history fetch for the sparkline. Never fails the
+    // primary quote refresh — `getPriceHistory` returns [] on any error.
+    let priceHistory = [];
+    try {
+      priceHistory = await getPriceHistory(ticker, { range: '1mo', interval: '1d' });
+    } catch (historyErr) {
+      console.warn(`⚠️ Sparkline fetch failed for ${ticker}: ${historyErr.message}`);
+    }
+    upsertQuoteData(ticker, quote, priceHistory);
     touchStock(ticker);
 
     upsertByKey('stock_refresh_status', 'ticker', ticker, {

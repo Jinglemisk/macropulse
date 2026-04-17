@@ -32,6 +32,7 @@ function buildStockPayload(row) {
       latestPrice: row.latest_price,
       priceTimestamp: row.price_timestamp
     },
+    priceHistory: parseJsonArray(row.price_history),
     classification: row.final_class ? {
       class: row.final_class,
       confidence: row.confidence,

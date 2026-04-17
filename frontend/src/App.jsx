@@ -1,288 +1,256 @@
-import React, { useEffect, useState } from 'react';
-import RegimeDisplay from './components/RegimeDisplay';
-import AddStockForm from './components/AddStockForm';
+import React, { useCallback, useRef, useState } from 'react';
+import Topbar from './components/Topbar';
+import RegimeHero from './components/RegimeHero';
+import Panel from './components/Panel';
 import PortfolioSummaryStrip from './components/PortfolioSummaryStrip';
 import StockTable from './components/StockTable';
 import NotesPanel from './components/NotesPanel';
-import SideMenu from './components/SideMenu';
-import { portfolioAPI, refreshAPI, regimeAPI, stocksAPI } from './utils/api';
+import CommandPalette from './components/CommandPalette';
+import ShortcutHelp from './components/ShortcutHelp';
+import { KeyboardShortcutsProvider } from './components/KeyboardShortcutsProvider';
+import ScoreGauge from './components/ScoreGauge';
+import AllocationChart from './components/AllocationChart';
+import IndicatorGrid from './components/IndicatorGrid';
+import InterpretationPanel from './components/InterpretationPanel';
+import { useTheme } from './components/ThemeProvider';
+import { useDashboardData } from './hooks/useDashboardData';
+import { cx } from './utils/classes';
+import { formatDateTime } from './utils/formatting';
+
+function StatusBanner({ status, error, onDismiss }) {
+  if (!status && !error) return null;
+  const tone = error ? 'error' : status?.tone || 'info';
+  const message = error || status?.message;
+  const map = {
+    info:    'border-accent/40 text-accent bg-accent/5',
+    success: 'border-up/40     text-up     bg-up/5',
+    warning: 'border-warn/40   text-warn   bg-warn/5',
+    error:   'border-down/60   text-down   bg-down/10'
+  };
+  return (
+    <div className={cx('font-mono text-[12px] border px-3 py-1.5 flex items-center gap-2', map[tone])}>
+      <span className="smallcaps-tight opacity-80">{tone.toUpperCase()}</span>
+      <span className="flex-1">{message}</span>
+      <button onClick={onDismiss} className="opacity-60 hover:opacity-100">×</button>
+    </div>
+  );
+}
 
 function App() {
-  const [stocks, setStocks] = useState([]);
-  const [regime, setRegime] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState(false);
-  const [refreshingAll, setRefreshingAll] = useState(false);
-  const [error, setError] = useState(null);
-  const [status, setStatus] = useState(null);
-  const [refreshReport, setRefreshReport] = useState(null);
-  const [editingNotes, setEditingNotes] = useState(null);
+  const data = useDashboardData();
+  const { setTheme, setDensity } = useTheme();
 
-  useEffect(() => {
-    loadInitialData();
+  const [editingNotes, setEditingNotes] = useState(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  // Imperative refs registered by children for global commands.
+  const searchRef = useRef(null);
+  const jumpToTickerRef = useRef(null);
+
+  const registerSearchInput = useCallback((ref) => { searchRef.current = ref; }, []);
+  const registerRowScroll = useCallback((fn) => { jumpToTickerRef.current = fn; }, []);
+
+  const focusSearch = useCallback(() => {
+    const input = searchRef.current?.current;
+    if (input) {
+      input.focus();
+      input.select?.();
+    }
   }, []);
 
-  const getErrorMessage = (err, fallback) =>
-    err.response?.data?.error || err.message || fallback;
+  const jumpTo = useCallback((id) => {
+    const el = document.getElementById(id);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
-  const getReportTone = (refreshStatus) => {
-    if (refreshStatus === 'failed') return 'error';
-    if (refreshStatus === 'warning') return 'warning';
-    return 'success';
-  };
+  const jumpToTicker = useCallback((tk) => {
+    jumpTo('holdings');
+    setTimeout(() => jumpToTickerRef.current?.(tk), 200);
+  }, [jumpTo]);
 
-  const buildRefreshReport = (result) => {
-    const domains = result.domains || {};
-    const orderedDomains = [
-      ['quotes', 'Quotes'],
-      ['details', 'Details'],
-      ['macro', 'Macro']
-    ]
-      .filter(([key]) => domains[key])
-      .map(([key, label]) => ({
-        key,
-        label,
-        ...domains[key]
-      }));
-
-    return {
-      tone: getReportTone(result.status),
-      message: result.message,
-      domains: orderedDomains,
-      updatedAt: new Date().toISOString()
-    };
-  };
-
-  const loadPortfolioData = async () => {
-    const [stocksRes, summaryRes] = await Promise.all([
-      stocksAPI.getAll(),
-      portfolioAPI.getSummary()
-    ]);
-
-    setStocks(stocksRes.data.stocks);
-    setSummary(summaryRes.data);
-  };
-
-  const loadDashboardData = async ({ showLoading = false } = {}) => {
-    try {
-      if (showLoading) {
-        setLoading(true);
-      }
-      setError(null);
-      setStatus(null);
-
-      const [stocksRes, regimeRes, summaryRes] = await Promise.allSettled([
-        stocksAPI.getAll(),
-        regimeAPI.getCurrent(),
-        portfolioAPI.getSummary()
-      ]);
-
-      if (stocksRes.status === 'rejected') {
-        throw stocksRes.reason;
-      }
-
-      if (summaryRes.status === 'rejected') {
-        throw summaryRes.reason;
-      }
-
-      setStocks(stocksRes.value.data.stocks);
-      setSummary(summaryRes.value.data);
-
-      if (regimeRes.status === 'fulfilled') {
-        setRegime(regimeRes.value.data);
-      } else {
-        setRegime({
-          available: false,
-          error: getErrorMessage(regimeRes.reason, 'Failed to load macro regime'),
-          refresh: {
-            status: 'failed',
-            message: 'Macro data unavailable'
-          },
-          interpretation: []
-        });
-      }
-    } catch (err) {
-      console.error('Error loading data:', err);
-      setError(getErrorMessage(err, 'Failed to load data'));
-    } finally {
-      if (showLoading) {
-        setLoading(false);
-      }
-    }
-  };
-
-  const loadInitialData = async () => {
-    await loadDashboardData({ showLoading: true });
-  };
-
-  const handleAddStock = async (ticker) => {
-    try {
-      setAdding(true);
-      setError(null);
-      setStatus(null);
-      setRefreshReport(null);
-
-      await stocksAPI.add(ticker);
-      await loadPortfolioData();
-      setStatus({ tone: 'success', message: `${ticker} added to the portfolio.` });
-    } catch (err) {
-      console.error('Error adding stock:', err);
-      setError(getErrorMessage(err, 'Failed to add stock'));
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const handleDeleteStock = async (ticker) => {
-    try {
-      setError(null);
-      setStatus(null);
-      setRefreshReport(null);
-      await stocksAPI.delete(ticker);
-      await loadPortfolioData();
-      setStatus({ tone: 'success', message: `${ticker} removed from the portfolio.` });
-    } catch (err) {
-      console.error('Error deleting stock:', err);
-      setError(getErrorMessage(err, 'Failed to delete stock'));
-    }
-  };
-
-  const handleRefreshAll = async () => {
-    try {
-      setRefreshingAll(true);
-      setError(null);
-      setStatus({ tone: 'info', message: 'Refreshing quotes, details, and macro data...' });
-
-      const refreshRes = await refreshAPI.refreshAll();
-      await loadDashboardData();
-
-      setRefreshReport(buildRefreshReport(refreshRes.data));
-      setStatus({
-        tone: getReportTone(refreshRes.data.status),
-        message: refreshRes.data.message
-      });
-    } catch (err) {
-      console.error('Error refreshing dashboard:', err);
-      setError(getErrorMessage(err, 'Failed to refresh dashboard data'));
-      setStatus(null);
-    } finally {
-      setRefreshingAll(false);
-    }
-  };
-
-  const handleSaveNotes = async (ticker, notes) => {
-    try {
-      setError(null);
-      await stocksAPI.updateNotes(ticker, notes);
-      setStocks(currentStocks => currentStocks.map(stock =>
-        stock.ticker === ticker ? { ...stock, notes } : stock
-      ));
-      setStatus({ tone: 'success', message: `Saved notes for ${ticker}.` });
-    } catch (err) {
-      console.error(`Error saving notes for ${ticker}:`, err);
-      setError(getErrorMessage(err, `Failed to save notes for ${ticker}`));
-    }
-  };
-
-  if (loading) {
+  if (data.loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center' }}>
-        <div className="loading">Loading dashboard...</div>
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="font-mono text-muted smallcaps-tight">
+          <span className="text-accent blink">█</span> LOADING DASHBOARD…
+        </div>
       </div>
     );
   }
 
+  const isEnhanced = data.regime?.scores && data.regime?.allocation && data.regime?.breakdown;
+
   return (
-    <>
-      <SideMenu />
-      <div style={{ padding: '24px', paddingLeft: '100px', maxWidth: '1700px', margin: '0 auto' }}>
-        <header
-          id="home"
-          style={{
-            marginBottom: '20px',
-            scrollMarginTop: '20px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: '24px'
-          }}
-        >
-          <div>
-            <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>
-              Macro Pulse
-            </h1>
-            <p style={{ color: '#a0a0a0', fontSize: '14px' }}>
-              Track stock classifications across macro regimes
-            </p>
-          </div>
+    <KeyboardShortcutsProvider
+      onOpenPalette={() => setPaletteOpen(true)}
+      onOpenShortcuts={() => setHelpOpen((o) => !o)}
+      onRefresh={data.refreshAll}
+      onFocusSearch={focusSearch}
+      jumps={{ h: 'home', a: 'advice', m: 'macro', s: 'holdings', r: 'home' }}
+    >
+      <div className="min-h-screen bg-bg text-text">
+        <Topbar
+          stocks={data.stocks}
+          regime={data.regime}
+          refreshReport={data.refreshReport}
+          onRefresh={data.refreshAll}
+          refreshing={data.refreshingAll}
+          onOpenPalette={() => setPaletteOpen(true)}
+          onOpenShortcuts={() => setHelpOpen(true)}
+          onJumpToTicker={jumpToTicker}
+        />
 
-          <button className="primary" onClick={handleRefreshAll} disabled={refreshingAll}>
-            {refreshingAll ? 'Refreshing...' : 'Refresh Dashboard'}
-          </button>
-        </header>
-
-        {refreshReport && (
-          <div className={`refresh-report ${refreshReport.tone}`} style={{ marginBottom: '16px' }}>
-            <div className="refresh-report-header">
-              <strong>{refreshReport.message}</strong>
+        <main className="max-w-[1700px] mx-auto px-3 md:px-5 pb-24 pt-4 space-y-5">
+          {/* Status banners */}
+          {(data.error || data.status) && (
+            <div className="space-y-2">
+              {data.error  && <StatusBanner error={data.error}    onDismiss={data.dismissError}  />}
+              {data.status && <StatusBanner status={data.status}  onDismiss={data.dismissStatus} />}
             </div>
-            <div className="refresh-report-domains">
-              {refreshReport.domains.map(domain => (
-                <div key={domain.key} className="refresh-report-domain">
-                  <span className="refresh-report-domain-label">{domain.label}</span>
-                  <span className={`refresh-report-domain-status ${domain.status}`}>
-                    {domain.status}
-                  </span>
-                  <span>
-                    {domain.key === 'macro'
-                      ? `${domain.succeeded} series succeeded, ${domain.failed} failed`
-                      : `${domain.succeeded}/${domain.requested} succeeded`}
-                  </span>
-                  <span className="refresh-report-domain-message">{domain.message}</span>
+          )}
+
+          {/* Refresh report */}
+          {data.refreshReport && (
+            <Panel
+              title="LAST REFRESH"
+              subtitle={formatDateTime(data.refreshReport.updatedAt)}
+              tone={data.refreshReport.tone === 'success' ? 'default' : data.refreshReport.tone === 'warning' ? 'warn' : 'danger'}
+              compact
+            >
+              <div className="font-mono text-[12px]">
+                <div className="text-text mb-2">{data.refreshReport.message}</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  {data.refreshReport.domains.map((d) => (
+                    <div key={d.key} className="border border-line bg-bg/50 p-2">
+                      <div className="flex items-center justify-between">
+                        <span className="smallcaps-tight text-muted">{d.label}</span>
+                        <span className={cx(
+                          'smallcaps-tight px-1 border',
+                          d.status === 'success' && 'text-up   border-up/40',
+                          d.status === 'warning' && 'text-warn border-warn/40',
+                          d.status === 'failed'  && 'text-down border-down/40'
+                        )}>{d.status}</span>
+                      </div>
+                      <div className="mt-1 text-text">
+                        {d.key === 'macro'
+                          ? `${d.succeeded ?? 0} ok · ${d.failed ?? 0} fail`
+                          : `${d.succeeded ?? 0}/${d.requested ?? 0} ok`}
+                      </div>
+                      {d.message && <div className="mt-1 text-muted text-[11px]">{d.message}</div>}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
+            </Panel>
+          )}
 
-        {status && (
-          <div className={`status-banner ${status.tone}`} style={{ marginBottom: '16px' }}>
-            {status.message}
-          </div>
-        )}
+          {/* THE VERDICT */}
+          <RegimeHero regime={data.regime} />
 
-        {error && (
-          <div className="status-banner error" style={{ marginBottom: '24px' }}>
-            {error}
-          </div>
-        )}
+          {/* Portfolio summary */}
+          <Panel
+            title="PORTFOLIO"
+            tooltip="Headline stats across your tracked stocks: total tracked, average classification confidence, low-confidence count, and latest detail refresh timestamp."
+            subtitle="OVERVIEW"
+          >
+            <PortfolioSummaryStrip summary={data.summary} />
+          </Panel>
 
-        <RegimeDisplay regime={regime} loading={false} error={null} />
+          {/* Macro detail panels — only if enhanced regime data is available */}
+          {isEnhanced && (
+            <>
+              <Panel
+                id="advice"
+                title="RECOMMENDED ALLOCATION"
+                tooltip="Allocation across Classes A–D derived from the current Fed Pressure Score (FPS) and Growth Pulse Score (GPS). Updates as macro data shifts."
+              >
+                <AllocationChart
+                  allocation={data.regime.allocation}
+                  allocationSteps={data.regime.allocation_steps}
+                />
+              </Panel>
 
-        <PortfolioSummaryStrip summary={summary} />
+              <Panel
+                id="macro"
+                title="MACRO ENGINE"
+                tooltip="FPS / GPS scores driving the regime classification, plus the underlying 13 indicators with per-indicator contributions to each score."
+              >
+                {/* Top: scores side-by-side with interpretation bullets — no wasted row. */}
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1.1fr] gap-x-5 gap-y-3 items-start">
+                  <ScoreGauge
+                    label="Fed Pressure Score (FPS)"
+                    value={data.regime.scores.fps}
+                    interpretation={data.regime.scores.fps_interpretation}
+                  />
+                  <ScoreGauge
+                    label="Growth Pulse Score (GPS)"
+                    value={data.regime.scores.gps}
+                    interpretation={data.regime.scores.gps_interpretation}
+                  />
+                  <div className="lg:pl-4 lg:border-l border-line/40">
+                    <InterpretationPanel messages={data.regime.interpretation} />
+                  </div>
+                </div>
 
-        <AddStockForm onAdd={handleAddStock} loading={adding} />
+                {/* Split indicator grid sits below, two halves side by side. */}
+                <div className="mt-3 pt-3 border-t border-line/40">
+                  <IndicatorGrid
+                    fpsBreakdown={data.regime.breakdown.fps}
+                    gpsBreakdown={data.regime.breakdown.gps}
+                  />
+                </div>
+              </Panel>
+            </>
+          )}
 
-        <section id="stocks" style={{ scrollMarginTop: '20px' }}>
+          {/* HOLDINGS */}
           <StockTable
-            stocks={stocks}
-            onDelete={handleDeleteStock}
+            stocks={data.stocks}
+            onDelete={data.deleteStock}
             onEditNotes={(ticker, notes) => setEditingNotes({ ticker, notes })}
-            macroRefresh={regime?.refresh || null}
+            macroRefresh={data.regime?.refresh || null}
+            onAdd={data.addStock}
+            adding={data.adding}
+            registerSearchInput={registerSearchInput}
+            registerRowScroll={registerRowScroll}
           />
-        </section>
 
+          <footer className="font-mono text-[10px] text-muted/60 pt-6 pb-2 flex items-center gap-2 smallcaps-tight">
+            <span>MACROPULSE</span>
+            <span className="flex-1 border-t border-line/40" />
+            <span>EOL</span>
+          </footer>
+        </main>
+
+        {/* Modals */}
         {editingNotes && (
           <NotesPanel
             ticker={editingNotes.ticker}
             notes={editingNotes.notes}
-            onSave={handleSaveNotes}
+            onSave={data.saveNotes}
             onClose={() => setEditingNotes(null)}
           />
         )}
+
+        <CommandPalette
+          open={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+          tickers={data.stocks.map((s) => s.ticker)}
+          handlers={{
+            addStock: data.addStock,
+            deleteStock: data.deleteStock,
+            refresh: data.refreshAll,
+            setTheme,
+            setDensity,
+            goto: jumpTo,
+            jumpTo: jumpToTicker
+          }}
+        />
+
+        <ShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
       </div>
-    </>
+    </KeyboardShortcutsProvider>
   );
 }
 
