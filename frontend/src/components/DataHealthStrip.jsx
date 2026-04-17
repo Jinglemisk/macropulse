@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { cx } from '../utils/classes';
 import { formatDateTime } from '../utils/formatting';
 
@@ -55,6 +55,32 @@ function worstOf(stats) {
 
 function DataHealthStrip({ stocks = [], macroRefresh, refreshReport, onJumpToTicker }) {
   const [open, setOpen] = useState(false);
+  // Flip-side decision: panel aligns with the trigger's left edge by default,
+  // but flips to right-alignment when its width would spill past the viewport.
+  const [flipRight, setFlipRight] = useState(false);
+  const triggerRef = useRef(null);
+  const rootRef = useRef(null);
+  const PANEL_WIDTH = 420;
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const room = window.innerWidth - rect.left;
+    setFlipRight(room < PANEL_WIDTH + 12);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (!rootRef.current?.contains(e.target)) setOpen(false); };
+    const onKey  = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
   const stats = useMemo(() => summariseStocks(stocks), [stocks]);
   const macroStatus = macroRefresh?.status || 'never';
 
@@ -82,14 +108,16 @@ function DataHealthStrip({ stocks = [], macroRefresh, refreshReport, onJumpToTic
     .pop();
 
   return (
-    <div className="font-mono text-[11px]">
+    <div ref={rootRef} className="relative font-mono text-[11px]">
       {/* Compact line. */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cx(
           'inline-flex items-center gap-2 px-2 h-7 border border-line bg-surf/60',
-          'hover:border-accent/60 transition-colors'
+          'hover:border-accent/60 transition-colors',
+          open && 'border-accent/60 bg-accent/5'
         )}
         aria-expanded={open}
         title="Data freshness · click to expand"
@@ -107,7 +135,13 @@ function DataHealthStrip({ stocks = [], macroRefresh, refreshReport, onJumpToTic
       </button>
 
       {open && (
-        <div className="absolute right-3 top-full mt-1 z-40 w-[420px] bg-bg border border-accent/60 p-3 shadow-[0_0_0_1px_rgb(var(--bg))]">
+        <div
+          className={cx(
+            'absolute top-full mt-1 z-40 w-[420px] bg-bg border border-accent/60 p-3',
+            'shadow-[0_0_0_1px_rgb(var(--bg))]',
+            flipRight ? 'right-0' : 'left-0'
+          )}
+        >
           <div className="smallcaps-tight text-muted mb-2 flex items-center gap-2">
             <span>Data Health</span>
             <span className="flex-1 border-t border-line" />

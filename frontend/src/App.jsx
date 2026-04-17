@@ -176,7 +176,8 @@ function App() {
                 title="MACRO ENGINE"
                 tooltip="FPS / GPS scores driving the regime classification, plus the underlying 13 indicators with per-indicator contributions to each score."
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">
+                {/* Top: scores side-by-side with interpretation bullets — no wasted row. */}
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1.1fr] gap-x-5 gap-y-3 items-start">
                   <ScoreGauge
                     label="Fed Pressure Score (FPS)"
                     value={data.regime.scores.fps}
@@ -187,13 +188,13 @@ function App() {
                     value={data.regime.scores.gps}
                     interpretation={data.regime.scores.gps_interpretation}
                   />
+                  <div className="lg:pl-4 lg:border-l border-line/40">
+                    <InterpretationPanel messages={data.regime.interpretation} />
+                  </div>
                 </div>
 
-                <div className="border-t border-line/40 pt-4">
-                  <InterpretationPanel messages={data.regime.interpretation} />
-                </div>
-
-                <div className="mt-4 border-t border-line/40 pt-4">
+                {/* Split indicator grid sits below, two halves side by side. */}
+                <div className="mt-3 pt-3 border-t border-line/40">
                   <IndicatorGrid
                     fpsBreakdown={data.regime.breakdown.fps}
                     gpsBreakdown={data.regime.breakdown.gps}

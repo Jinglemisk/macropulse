@@ -41,63 +41,76 @@ function scoreColor(s) {
   return 'text-muted';
 }
 
+// Compact sub-table used for each half of the split indicator grid.
+function MiniTable({ rows }) {
+  return (
+    <table className="w-full text-[12px]">
+      <thead>
+        <tr className="text-muted smallcaps-tight border-y border-line">
+          <th className="text-left  font-normal py-1 px-2">INDICATOR</th>
+          <th className="text-right font-normal py-1 px-2">VALUE</th>
+          <th className="text-left  font-normal py-1 px-2 w-[56px]">CLASS</th>
+          <th className="text-right font-normal py-1 px-2 w-[52px]">FPS</th>
+          <th className="text-right font-normal py-1 px-2 w-[52px]">GPS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, i) => (
+          <tr key={i} className="border-b border-line/40 hover:bg-surf/40">
+            <td className="py-0.5 px-2 text-text truncate max-w-[140px]">{NAMES[row.indicator] || row.indicator}</td>
+            <td className="py-0.5 px-2 text-right tabular text-text whitespace-nowrap">{fmt(row.indicator, row.value)}</td>
+            <td className="py-0.5 px-2">
+              {row.classification && (
+                <span className={cx('px-1 py-0.5 border smallcaps-tight inline-block text-[9px]', classBadge(row.classification))}>
+                  {row.classification.toUpperCase()}
+                </span>
+              )}
+            </td>
+            <td className="py-0.5 px-2 text-right tabular">
+              {row.fps_score != null ? (
+                <span className={scoreColor(row.fps_score)}>
+                  {row.fps_score > 0 ? '+' : ''}{row.fps_score}
+                  <span className="text-muted text-[9px] ml-0.5">×{row.fps_weight}</span>
+                </span>
+              ) : <span className="text-muted">—</span>}
+            </td>
+            <td className="py-0.5 px-2 text-right tabular">
+              {row.gps_score != null ? (
+                <span className={scoreColor(row.gps_score)}>
+                  {row.gps_score > 0 ? '+' : ''}{row.gps_score}
+                  <span className="text-muted text-[9px] ml-0.5">×{row.gps_weight}</span>
+                </span>
+              ) : <span className="text-muted">—</span>}
+            </td>
+          </tr>
+        ))}
+        {rows.length === 0 && (
+          <tr><td colSpan={5} className="py-2 text-center text-muted">—</td></tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
+
 function IndicatorGrid({ fpsBreakdown = [], gpsBreakdown = [] }) {
   const map = new Map();
   fpsBreakdown.forEach((it) => map.set(it.indicator, { ...it, fps_score: it.score, fps_weight: it.weight }));
   gpsBreakdown.forEach((it) => map.set(it.indicator, { ...(map.get(it.indicator) || {}), ...it, gps_score: it.score, gps_weight: it.weight }));
   const rows = Array.from(map.values());
 
+  // Split into two halves so short indicator names don't leave giant horizontal gaps.
+  const mid  = Math.ceil(rows.length / 2);
+  const left  = rows.slice(0, mid);
+  const right = rows.slice(mid);
+
   return (
     <div className="font-mono">
-      <div className="overflow-x-auto -mx-4 md:mx-0">
-        <table className="w-full text-[12px]">
-          <thead>
-            <tr className="text-muted smallcaps-tight border-y border-line">
-              <th className="text-left  font-normal py-1.5 px-2">INDICATOR</th>
-              <th className="text-right font-normal py-1.5 px-2">VALUE</th>
-              <th className="text-left  font-normal py-1.5 px-2">CLASS</th>
-              <th className="text-right font-normal py-1.5 px-2">FPS</th>
-              <th className="text-right font-normal py-1.5 px-2">GPS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={i} className="border-b border-line/40 hover:bg-surf/40">
-                <td className="py-1 px-2 text-text">{NAMES[row.indicator] || row.indicator}</td>
-                <td className="py-1 px-2 text-right tabular text-text">{fmt(row.indicator, row.value)}</td>
-                <td className="py-1 px-2">
-                  {row.classification && (
-                    <span className={cx('px-1.5 py-0.5 border smallcaps-tight inline-block', classBadge(row.classification))}>
-                      {row.classification.toUpperCase()}
-                    </span>
-                  )}
-                </td>
-                <td className="py-1 px-2 text-right tabular">
-                  {row.fps_score != null ? (
-                    <span className={scoreColor(row.fps_score)}>
-                      {row.fps_score > 0 ? '+' : ''}{row.fps_score}
-                      <span className="text-muted text-[10px] ml-1">×{row.fps_weight}</span>
-                    </span>
-                  ) : <span className="text-muted">—</span>}
-                </td>
-                <td className="py-1 px-2 text-right tabular">
-                  {row.gps_score != null ? (
-                    <span className={scoreColor(row.gps_score)}>
-                      {row.gps_score > 0 ? '+' : ''}{row.gps_score}
-                      <span className="text-muted text-[10px] ml-1">×{row.gps_weight}</span>
-                    </span>
-                  ) : <span className="text-muted">—</span>}
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={5} className="py-3 text-center text-muted">No indicator data</td></tr>
-            )}
-          </tbody>
-        </table>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-1">
+        <MiniTable rows={left} />
+        <MiniTable rows={right} />
       </div>
 
-      <div className="flex flex-wrap gap-3 text-[11px] text-muted mt-3 pt-2 border-t border-line/40">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted mt-2 pt-1.5 border-t border-line/40">
         <span><span className="text-up">●</span> Low — below threshold</span>
         <span><span className="text-muted">●</span> Normal — within range</span>
         <span><span className="text-down">●</span> High — above threshold</span>

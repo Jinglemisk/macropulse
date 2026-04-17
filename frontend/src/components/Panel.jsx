@@ -77,7 +77,13 @@ function Panel({
         <span className="font-mono text-muted">─┐</span>
       </header>
 
-      <div className={compact ? 'p-3' : 'p-4 md:p-5'}>
+      <div
+        style={{
+          padding: compact
+            ? 'var(--pad)'
+            : 'calc(var(--pad) + 4px)'
+        }}
+      >
         {children}
       </div>
     </section>
