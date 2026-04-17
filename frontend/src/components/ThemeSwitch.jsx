@@ -15,7 +15,7 @@ function ThemeSwitch() {
         onClick={cycleTheme}
         onContextMenu={(e) => { e.preventDefault(); setOpen((o) => !o); }}
         title="Click to cycle themes · Right-click to choose"
-        className="px-2 h-7 w-[200px] inline-flex items-center gap-1.5 border border-line hover:border-accent/60 bg-surf/60 text-text text-[11px] smallcaps-tight"
+        className="px-2 h-7 w-[184px] inline-flex items-center gap-1.5 border border-line hover:border-accent/60 bg-surf/60 text-text text-[11px] smallcaps-tight"
       >
         <span className="w-2 h-2 inline-block bg-accent shrink-0" aria-hidden />
         <span className="flex-1 text-left truncate">{current?.label || activeThemeId}</span>
