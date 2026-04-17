@@ -47,3 +47,11 @@ Thumbs.db
 .cache/
 *.cache
 frontend/.vite/
+
+# Playwright MCP scratch output
+.playwright-mcp/
+
+# Ad-hoc screenshots / image backups
+revamp-*.png
+*-backup.jpeg
+*-backup.png
