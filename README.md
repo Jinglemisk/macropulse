@@ -1,253 +1,192 @@
 <div align="center">
-  <img src="./macropulse.jpeg" alt="Macropulse logo" width="320" />
+  <img src="./macropulse.jpeg" alt="Macropulse" width="320" />
   <h1>Macropulse</h1>
+  <p><em>A Bloomberg-terminal-flavored portfolio dashboard with a US macro regime overlay. Local, single-user, keyboard-first.</em></p>
 </div>
 
-Macropulse is a local stock classification dashboard built around a macro regime overlay. It classifies equities into four buckets using growth, valuation, and leverage metrics, then combines that with a US macro regime model to suggest portfolio tilts.
+---
 
-The project is designed for local, single-user use. It stores data in SQLite, fetches market and macro data through OpenBB-backed providers, and runs as a Node/React app with a small Python bridge.
+## What it does
 
-## What It Does
+- Classifies equities into four buckets (A · B · C · D) from growth, valuation and leverage metrics.
+- Runs a US macro regime model (FPS / GPS over 13 indicators) and turns it into a recommended A/B/C/D allocation.
+- Stores positions, fundamentals, notes, and historical classifications in a local SQLite file.
+- Presents everything through a switchable, keyboard-driven terminal UI with three layout modes and four palettes.
 
-- Classifies stocks into four classes: A, B, C, and D
-- Computes confidence scores for each classification
-- Calculates a macro regime from Fed balance sheet, rates, and broader economic indicators
-- Applies FPS/GPS overlay logic to suggest regime-aware allocations
-- Stores stocks, fundamentals, notes, and historical classifications locally
-- Uses provider fallback for fundamentals, quotes, and profiles
+Not a broker, not a backtester, not multi-user.
 
 ## Stack
 
-**Backend**
-- Node.js + Express
-- SQLite via `better-sqlite3`
-- Python bridge for OpenBB access
+| Layer        | Tech                                                  |
+| ------------ | ----------------------------------------------------- |
+| Backend      | Node 18 + Express, `better-sqlite3`                   |
+| Data bridge  | Python 3.11 + OpenBB (FMP · yfinance · Intrinio · FRED) |
+| Frontend     | React 18 + Vite + Tailwind, runtime-themed via CSS vars |
+| Persistence  | SQLite (`data/stocks.db`) + `localStorage` for prefs   |
 
-**Frontend**
-- React 18
-- Vite
-- Tailwind CSS
-- Axios
-
-**Data Sources**
-- Financial Modeling Prep via OpenBB
-- Yahoo Finance via OpenBB fallback
-- Intrinio via OpenBB fallback
-- FRED for macro series
-
-## Requirements
-
-- Node.js 18+
-- Python 3.11+ recommended
-- An FMP API key
-- A FRED API key
-
-Python is expected to run from a project-local virtual environment. Do not rely on a random global `python3` install if you want reproducible setup.
-
-## Quick Start
+## Quick start
 
 ```bash
-git clone <your-repo-url>
-cd macropulse
+git clone <repo>
+cd portfolio-app
 
 npm install
-cd frontend
-npm install
-cd ..
+(cd frontend && npm install)
 
-python3 -m venv venv
-source venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+python3 -m venv venv && source venv/bin/activate
+pip install --upgrade pip && pip install -r requirements.txt
 
-cp .env.example .env
-```
+cp .env.example .env       # set FMP_API_KEY + FRED_API_KEY
 
-Edit `.env` and set your API keys. Then initialize the database, fetch macro history, and start both servers:
-
-```bash
 npm run init-db
 npm run fetch-macro
-npm run dev:all
+npm run dev:all            # backend :8345 · frontend :5173
 ```
 
 Open `http://localhost:5173`.
 
-## Environment Variables
+## Environment
 
-The default `.env.example` is set up for a local virtual environment:
+All settings live in `.env`. The non-obvious ones:
 
-```bash
-FMP_API_KEY=your_fmp_api_key_here
-FRED_API_KEY=your_fred_api_key_here
+| Var              | Purpose                                             |
+| ---------------- | --------------------------------------------------- |
+| `FMP_API_KEY`    | Primary fundamentals / quotes / profiles provider   |
+| `FRED_API_KEY`   | Macro time series                                   |
+| `PYTHON_PATH`    | Must point at the venv's `python` (OpenBB lives there) |
+| `PORT`           | Backend port (default `8345`)                       |
+| `DATABASE_PATH`  | SQLite file location                                |
+| `PRIMARY_*` / `FALLBACK_*` | Per-domain provider chains (see `.env.example`) |
 
-OPENBB_FMP_API_KEY=your_fmp_api_key_here
-OPENBB_FRED_API_KEY=your_fred_api_key_here
+`OPENBB_FMP_API_KEY` and `OPENBB_FRED_API_KEY` should mirror the non-prefixed values.
 
-PORT=8345
-DATABASE_PATH=./data/stocks.db
-CACHE_TTL_HOURS=24
+## UI
 
-PYTHON_PATH=./venv/bin/python
-OPENBB_TIMEOUT_MS=30000
+The dashboard is split into three switchable **layouts** and four interchangeable **themes**.
 
-PRIMARY_FUNDAMENTALS_PROVIDER=fmp
-FALLBACK_PROVIDERS=yfinance,intrinio
-PRIMARY_QUOTE_PROVIDER=fmp
-FALLBACK_QUOTE_PROVIDERS=yfinance,intrinio
-PRIMARY_PROFILE_PROVIDER=fmp
-FALLBACK_PROFILE_PROVIDERS=yfinance,intrinio
+### Layouts
+
+Pick from the topbar pill, hit `d` to cycle, or run `/layout <id>` in the command palette. Choice persists in `localStorage` (`macropulse:prefs`).
+
+| Glyph | Mode    | Spatial idea                                                                                            | Best for                |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `▤`  | Cockpit | 3-col command bridge — sticky macro rail · verdict + allocation + holdings · sticky portfolio rail      | Reading the regime      |
+| `▦`  | Panel   | Verdict ribbon + 12-col quadrant grid (allocation · macro engine, holdings · portfolio + activity)      | Glancing everything     |
+| `▥`  | Floor   | One-line ticker ribbon + narrow indicator rail + holdings-dominant column with collapsible macro engine | Managing positions      |
+
+Layouts share components (`VerdictRibbon`, `TickerRibbon`, `MacroRail`, `PortfolioRail`, `AllocationStrip`, `ActivityLog`, `CollapsiblePanel`); only their composition differs.
+
+### Themes
+
+Configured in `frontend/public/settings.json` (loaded at runtime — no rebuild needed). Each palette is 15 RGB triplets.
+
+| ID         | Look                  |
+| ---------- | --------------------- |
+| `phosphor` | Green CRT (default)   |
+| `amber`    | Bloomberg amber       |
+| `slate`    | Dark cyan             |
+| `paper`    | Bright light          |
+
+Switch via the topbar pill, `t` to cycle, or `/theme <id>`.
+
+### Keyboard
+
+| Keys                | Action                              |
+| ------------------- | ----------------------------------- |
+| `⌘K` / `Ctrl K`     | Command palette                     |
+| `r`                 | Refresh dashboard                   |
+| `t` / `d`           | Cycle theme · cycle layout          |
+| `/`                 | Focus holdings search               |
+| `?`                 | Toggle this list                    |
+| `g h` / `a` / `m` / `s` | Jump to home · advice · macro · holdings |
+
+### Command palette (`⌘K`)
+
+Plain text → ticker actions (`AAPL` adds, fuzzy-matches existing rows). Slash → commands.
+
+```
+/refresh            run quotes + details + macro
+/theme amber        switch palette
+/layout floor       switch dashboard layout
+/goto holdings      scroll to section
+/delete AAPL        remove ticker (confirm)
 ```
 
-Notes:
+## Models
 
-- `FMP_API_KEY` and `OPENBB_FMP_API_KEY` should usually be the same value.
-- `FRED_API_KEY` and `OPENBB_FRED_API_KEY` should usually be the same value.
-- The backend shells out to `PYTHON_PATH`, so it must point to the Python environment where `openbb` is installed.
-- Provider order is configurable and can differ for fundamentals, quotes, and profiles.
-- If all OpenBB fundamentals providers fail, the backend falls back to a direct Yahoo Finance fetch before giving up.
+### Classification (A–D)
 
-## Running the App
+- **A** — lower growth, lower valuation, lower leverage
+- **B** — quality growth, moderate valuation and leverage
+- **C** — faster growth, richer valuation
+- **D** — hypergrowth / pre-profit / speculative
 
-Run both servers together:
+A confidence score reports how cleanly a name lands in its bucket.
 
-```bash
-npm run dev:all
-```
+### Macro regime
 
-Or separately:
+Base liquidity regime (`Most Liquid` → `In Between (prefer C)` → `In Between (prefer B)` → `Least Liquid`) is shifted by two scores:
 
-```bash
-# Terminal 1
-npm run dev
+- **FPS** — Fed Pressure Score
+- **GPS** — Growth Pulse Score
 
-# Terminal 2
-cd frontend
-npm run dev
-```
+Both run on 13 indicators with per-indicator weights. The output is an A/B/C/D allocation tilt; full breakdown lives in [docs/FPS_GPS_IMPLEMENTATION.md](./docs/FPS_GPS_IMPLEMENTATION.md).
 
-The frontend proxies `/api` requests to the backend on port `8345`.
+## Refresh model
 
-## Usage
-
-1. Add ticker symbols from the UI.
-2. Review the returned fundamentals and stock class.
-3. Inspect the current macro regime and allocation guidance.
-4. Add notes to individual positions.
-5. Use `Refresh All` to refresh stock-level data.
-
-Macro data is not refreshed by the UI. To update macro history, run:
+Stock data and macro data refresh independently.
 
 ```bash
-npm run fetch-macro
+# UI button (or `r`) — quotes, details, macro in one run
+# CLI equivalents:
+npm run fetch-macro      # macro only (FRED series)
 ```
 
-Recommended cadence:
+Cadence: stock refresh after earnings or on demand; macro refresh weekly or after major releases.
 
-- Stock refresh: after earnings or when you want to refresh fundamentals and prices
-- Macro refresh: weekly or after major macro releases
-
-## Classification Model
-
-Stocks are grouped into four classes:
-
-- **Class A**: lower growth, lower valuation, lower leverage
-- **Class B**: quality growth with moderate valuation and leverage
-- **Class C**: faster growth with richer valuation
-- **Class D**: hypergrowth or pre-profit / speculative profiles
-
-Confidence scores indicate how clearly a stock fits a single bucket.
-
-## Regime Model
-
-The macro engine starts from a base liquidity regime:
-
-1. `Most Liquid`
-2. `In Between (prefer C)`
-3. `In Between (prefer B)`
-4. `Least Liquid`
-
-It then applies:
-
-- **FPS**: Fed Pressure Score
-- **GPS**: Growth Pulse Score
-
-These adjust the base allocation to be more defensive or more growth-oriented depending on macro conditions.
-
-## Project Structure
+## Project layout
 
 ```text
-macropulse/
+portfolio-app/
 ├── backend/
-│   ├── adapters/openbb_adapter.py
-│   ├── apis/
-│   ├── routes/
-│   ├── services/
-│   ├── utils/
-│   ├── config.js
-│   ├── database.js
-│   └── server.js
+│   ├── adapters/openbb_adapter.py    # Python bridge to OpenBB
+│   ├── apis/                         # provider clients
+│   ├── routes/                       # express routes
+│   ├── services/                     # classification + regime engines
+│   ├── config.js · database.js · server.js
 ├── frontend/
-│   ├── src/
-│   ├── index.html
-│   └── package.json
+│   ├── public/settings.json          # runtime themes + default layout
+│   └── src/
+│       ├── App.jsx                   # routes by layout id
+│       ├── layouts/                  # CockpitLayout · PanelLayout · FloorLayout
+│       ├── components/               # shared dense pieces (rails, ribbons, panels)
+│       ├── hooks/useDashboardData.js # single hook fronting the API
+│       ├── config/defaultSettings.js # inlined fallback for settings.json
+│       └── utils/cssVars.js          # palette → CSS var application
 ├── docs/
 │   ├── FPS_GPS_IMPLEMENTATION.md
 │   └── how-to-invest.md
-├── scripts/
-│   ├── fetchMacroData.js
-│   └── initDb.js
-├── .env.example
-├── requirements.txt
-└── README.md
+├── scripts/{initDb,fetchMacroData}.js
+├── layout.md                         # ASCII wireframes for all three layouts
+├── requirements.txt · .env.example
 ```
 
 ## Troubleshooting
 
-**`No module named openbb` or Python bridge failures**
+| Symptom                            | Fix                                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| `No module named openbb`           | Activate `venv`, reinstall `requirements.txt`, point `PYTHON_PATH` at `./venv/bin/python`. |
+| Refresh stalls / provider errors   | Check `PRIMARY_*` and `FALLBACK_*` chains; final fundamentals fallback hits Yahoo direct.  |
+| `MACRO REGIME UNAVAILABLE` banner  | Run `npm run fetch-macro`.                                                                 |
+| Want a clean DB                    | `rm -f data/stocks.db data/stocks.db-shm data/stocks.db-wal && npm run init-db && npm run fetch-macro` |
+| Theme / layout changes don't stick | Clear `localStorage` key `macropulse:prefs`.                                               |
 
-- Activate the project venv.
-- Install dependencies with `pip install -r requirements.txt`.
-- Make sure `PYTHON_PATH` points to that interpreter.
+## Limits
 
-**Refresh is slow or a provider is failing**
-
-- The app tries providers in configured order with fallback.
-- Keep `fmp` as the primary provider unless you have a reason to change it.
-- If OpenBB's `yfinance` adapter is broken or a provider blocks a ticker, the backend will make one last direct Yahoo Finance attempt for fundamentals.
-- Review backend logs for provider-specific errors.
-
-**No regime data available**
-
-```bash
-npm run fetch-macro
-```
-
-**Need a clean local database**
-
-```bash
-rm -f data/stocks.db data/stocks.db-shm data/stocks.db-wal
-npm run init-db
-npm run fetch-macro
-```
-
-## Further Reading
-
-- [FPS/GPS Enhancement Specification](./docs/FPS_GPS_IMPLEMENTATION.md)
-- [Investment Methodology](./docs/how-to-invest.md)
-
-## Limitations
-
-- No authentication or multi-user support
-- Intended for local use, not hosted production deployment
-- Depends on third-party market/macro data providers
-- Free-tier API limits still apply
-- Not designed for intraday or execution-sensitive workflows
-
-## Contributing
-
-Issues and pull requests are welcome. If you plan to change the classification or macro logic materially, open an issue first so the assumptions stay explicit.
+- Single-user, no auth — runs on `localhost`.
+- Subject to free-tier provider limits (FMP, FRED).
+- Daily-cadence data; not for intraday or execution.
 
 ## License
 
-MIT. See [LICENSE](./LICENSE).
+MIT — see [LICENSE](./LICENSE).
