@@ -2,20 +2,22 @@ import React, { useState } from 'react';
 import { cx } from '../utils/classes';
 
 // Bloomberg-terminal section shell.
-//   ┌── TITLE ──────────────────────── (?) ── meta ──┐
+//   ┌▮ TITLE ─────────────────────────── ? ── meta ──┐
 //   │ children                                       │
 //   └────────────────────────────────────────────────┘
 //
-// The header uses ASCII corner glyphs drawn with flexbox + border lines,
-// tooltip is a hover-triggered popover. Bottom rule is a hard double line.
+// The header has a solid colored "chapter mark" on the left, a darker tab
+// background, and a beefed-up uppercase title so each panel announces its
+// own start instead of bleeding into the next one. Tone tints the marker
+// and the top rule (default/warn/danger/accent).
 //
 // Props:
 //   id        — anchor id (for in-page jumps)
-//   title     — uppercase string (will be rendered in mono small caps)
-//   subtitle  — optional muted line under title
+//   title     — uppercase string (renders in mono, bold, large caps)
+//   subtitle  — optional muted line beside the title
 //   tooltip   — string, shown on (?) hover
 //   actions   — React node, rendered right-aligned in the header
-//   tone      — 'default' | 'warn' | 'danger' | 'accent' (border tint)
+//   tone      — 'default' | 'warn' | 'danger' | 'accent' (chapter mark + rule tint)
 //   compact   — drops vertical padding
 //   className — extra classes for the wrapper
 function Panel({
@@ -31,25 +33,52 @@ function Panel({
     accent:  'border-accent/60'
   }[tone] || 'border-line';
 
+  // Chapter-mark colors — solid blocks on the header's left edge so the
+  // eye snaps to where each section starts.
+  const toneBlock = {
+    default: 'bg-accent',
+    warn:    'bg-warn',
+    danger:  'bg-down',
+    accent:  'bg-accent'
+  }[tone] || 'bg-accent';
+
+  const toneTitle = {
+    default: 'text-text',
+    warn:    'text-warn',
+    danger:  'text-down',
+    accent:  'text-accent'
+  }[tone] || 'text-text';
+
   return (
     <section
       id={id}
       className={cx(
         'relative bg-surf/40',
-        'border-x border-b-2 border-double',
+        // Thicker top edge gives every section an unmistakable "lid".
+        'border-x border-t-2 border-b-2 border-double',
         toneBorder,
         className
       )}
     >
-      {/* Header strip with corner brackets */}
+      {/* Header strip — darker than panel body, doubles as a tab marker. */}
       <header className={cx(
-        'flex items-center gap-3 select-none',
-        'border-t border-b',
+        'relative flex items-center gap-3 select-none',
+        'border-b',
         toneBorder,
-        'px-3 py-1.5'
+        'bg-bg/60 px-3 py-2'
       )}>
-        <span className="font-mono text-muted">┌─</span>
-        <h2 className="smallcaps text-text whitespace-nowrap">{title}</h2>
+        {/* Solid chapter mark + corner glyph */}
+        <span className={cx('inline-block w-1 h-5 shrink-0', toneBlock)} aria-hidden />
+        <span className="font-mono text-muted/70 text-[11px]">┌─</span>
+
+        <h2 className={cx(
+          'font-mono section-title whitespace-nowrap',
+          toneTitle,
+          'glow-text'
+        )}>
+          {title}
+        </h2>
+
         {tooltip && (
           <span
             className="relative inline-flex items-center"
@@ -69,12 +98,14 @@ function Panel({
             )}
           </span>
         )}
+
         {subtitle && (
-          <span className="text-muted text-[11px] font-mono truncate">— {subtitle}</span>
+          <span className="smallcaps-tight text-muted truncate">— {subtitle}</span>
         )}
-        <span className="flex-1 border-t border-line/60 mx-2" aria-hidden />
+
+        <span className="flex-1 border-t border-line/40 mx-2" aria-hidden />
         {actions && <div className="flex items-center gap-2">{actions}</div>}
-        <span className="font-mono text-muted">─┐</span>
+        <span className="font-mono text-muted/70 text-[11px]">─┐</span>
       </header>
 
       <div

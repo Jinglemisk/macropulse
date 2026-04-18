@@ -4,13 +4,6 @@ import ThemeSwitch from './ThemeSwitch';
 import LayoutSwitch from './LayoutSwitch';
 import DataHealthStrip from './DataHealthStrip';
 
-const NAV = [
-  { id: 'home',     label: 'HOME',     hint: 'g h' },
-  { id: 'advice',   label: 'ADVICE',   hint: 'g a' },
-  { id: 'macro',    label: 'MACRO',    hint: 'g m' },
-  { id: 'holdings', label: 'HOLDINGS', hint: 'g s' }
-];
-
 function Topbar({
   stocks, regime, refreshReport,
   onRefresh, refreshing,
@@ -36,7 +29,9 @@ function Topbar({
         under them gracefully (hidden on <lg).
       */}
       <div className="relative flex items-center justify-between gap-3 px-3 h-10">
-        {/* LEFT: brand + nav */}
+        {/* LEFT: brand + data health strip (took the slot the section nav
+            used to occupy — keyboard chords g h/a/m/s still jump to the
+            section anchors). */}
         <div className="flex items-center gap-3 min-w-0 shrink-0">
           <a
             href="#home"
@@ -50,24 +45,14 @@ function Topbar({
 
           <span className="text-muted hidden md:inline">│</span>
 
-          <nav className="hidden md:flex items-center gap-1">
-            {NAV.map((n) => (
-              <a
-                key={n.id}
-                href={`#${n.id}`}
-                onClick={(e) => { e.preventDefault(); goto(n.id)(); }}
-                title={`Jump to ${n.label} (${n.hint})`}
-                className={cx(
-                  'h-7 px-2.5 inline-flex items-center border border-line/70 bg-surf/50',
-                  'smallcaps-tight font-bold text-text whitespace-nowrap',
-                  'hover:bg-accent/15 hover:text-accent hover:border-accent/60',
-                  'transition-colors'
-                )}
-              >
-                {n.label}
-              </a>
-            ))}
-          </nav>
+          <div className="hidden md:block">
+            <DataHealthStrip
+              stocks={stocks}
+              macroRefresh={regime?.refresh}
+              refreshReport={refreshReport}
+              onJumpToTicker={onJumpToTicker}
+            />
+          </div>
         </div>
 
         {/* CENTER: command trigger — absolutely positioned so it stays on
@@ -94,17 +79,8 @@ function Topbar({
           <span className="font-mono text-[11px]">⌘K</span>
         </button>
 
-        {/* RIGHT: data health · theme · layout · refresh · help */}
+        {/* RIGHT: theme · layout · refresh · help */}
         <div className="flex items-center justify-end gap-1.5 shrink-0">
-          <div className="hidden lg:block">
-            <DataHealthStrip
-              stocks={stocks}
-              macroRefresh={regime?.refresh}
-              refreshReport={refreshReport}
-              onJumpToTicker={onJumpToTicker}
-            />
-          </div>
-
           <ThemeSwitch />
           <LayoutSwitch />
 
