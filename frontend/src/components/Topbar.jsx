@@ -1,7 +1,7 @@
 import React from 'react';
 import { cx } from '../utils/classes';
 import ThemeSwitch from './ThemeSwitch';
-import DensitySwitch from './DensitySwitch';
+import LayoutSwitch from './LayoutSwitch';
 import DataHealthStrip from './DataHealthStrip';
 
 const NAV = [
@@ -94,7 +94,7 @@ function Topbar({
           <span className="font-mono text-[11px]">⌘K</span>
         </button>
 
-        {/* RIGHT: data health · theme · density · refresh · help */}
+        {/* RIGHT: data health · theme · layout · refresh · help */}
         <div className="flex items-center justify-end gap-1.5 shrink-0">
           <div className="hidden lg:block">
             <DataHealthStrip
@@ -106,7 +106,7 @@ function Topbar({
           </div>
 
           <ThemeSwitch />
-          <DensitySwitch />
+          <LayoutSwitch />
 
           <button
             type="button"

@@ -24,7 +24,7 @@ const GROUPS = [
     title: 'PRESENTATION',
     keys: [
       ['t',   'Cycle theme preset'],
-      ['d',   'Cycle density (compact / normal / comfortable)']
+      ['d',   'Cycle layout (cockpit / panel / floor)']
     ]
   },
   {
@@ -33,7 +33,7 @@ const GROUPS = [
       ['AAPL',     'Add ticker'],
       ['/refresh', 'Refresh all data'],
       ['/theme amber', 'Switch theme by id'],
-      ['/density compact', 'Set density'],
+      ['/layout panel',    'Switch layout'],
       ['/goto holdings',   'Jump to section'],
       ['/delete AAPL',     'Remove a ticker']
     ]
