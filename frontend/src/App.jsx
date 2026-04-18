@@ -1,21 +1,24 @@
 import React, { useCallback, useRef, useState } from 'react';
 import Topbar from './components/Topbar';
-import RegimeHero from './components/RegimeHero';
 import Panel from './components/Panel';
-import PortfolioSummaryStrip from './components/PortfolioSummaryStrip';
-import StockTable from './components/StockTable';
 import NotesPanel from './components/NotesPanel';
 import CommandPalette from './components/CommandPalette';
 import ShortcutHelp from './components/ShortcutHelp';
 import { KeyboardShortcutsProvider } from './components/KeyboardShortcutsProvider';
-import ScoreGauge from './components/ScoreGauge';
-import AllocationChart from './components/AllocationChart';
-import IndicatorGrid from './components/IndicatorGrid';
-import InterpretationPanel from './components/InterpretationPanel';
 import { useTheme } from './components/ThemeProvider';
 import { useDashboardData } from './hooks/useDashboardData';
 import { cx } from './utils/classes';
 import { formatDateTime } from './utils/formatting';
+
+import CockpitLayout from './layouts/CockpitLayout';
+import PanelLayout   from './layouts/PanelLayout';
+import FloorLayout   from './layouts/FloorLayout';
+
+const LAYOUT_REGISTRY = {
+  cockpit: CockpitLayout,
+  panel:   PanelLayout,
+  floor:   FloorLayout
+};
 
 function StatusBanner({ status, error, onDismiss }) {
   if (!status && !error) return null;
@@ -38,7 +41,7 @@ function StatusBanner({ status, error, onDismiss }) {
 
 function App() {
   const data = useDashboardData();
-  const { setTheme, setDensity } = useTheme();
+  const { setTheme, setLayout, layout } = useTheme();
 
   const [editingNotes, setEditingNotes] = useState(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -79,7 +82,11 @@ function App() {
     );
   }
 
-  const isEnhanced = data.regime?.scores && data.regime?.allocation && data.regime?.breakdown;
+  // Resolve the layout component from the active layout id. Falls back to
+  // PanelLayout when an unknown id sneaks in via prefs/settings.json.
+  const ActiveLayout = LAYOUT_REGISTRY[layout] || PanelLayout;
+
+  const onEditNotes = (ticker, notes) => setEditingNotes({ ticker, notes });
 
   return (
     <KeyboardShortcutsProvider
@@ -101,8 +108,8 @@ function App() {
           onJumpToTicker={jumpToTicker}
         />
 
-        <main className="max-w-[1700px] mx-auto px-3 md:px-5 pb-24 pt-4 space-y-5">
-          {/* Status banners */}
+        <main className="max-w-[1700px] mx-auto px-3 md:px-5 pb-24 pt-4 space-y-3">
+          {/* Status banners — always above the layout shell */}
           {(data.error || data.status) && (
             <div className="space-y-2">
               {data.error  && <StatusBanner error={data.error}    onDismiss={data.dismissError}  />}
@@ -110,7 +117,7 @@ function App() {
             </div>
           )}
 
-          {/* Refresh report */}
+          {/* Refresh report — kept at App level so it survives layout switches */}
           {data.refreshReport && (
             <Panel
               title="LAST REFRESH"
@@ -145,75 +152,12 @@ function App() {
             </Panel>
           )}
 
-          {/* THE VERDICT */}
-          <RegimeHero regime={data.regime} />
-
-          {/* Portfolio summary */}
-          <Panel
-            title="PORTFOLIO"
-            tooltip="Headline stats across your tracked stocks: total tracked, average classification confidence, low-confidence count, and latest detail refresh timestamp."
-            subtitle="OVERVIEW"
-          >
-            <PortfolioSummaryStrip summary={data.summary} />
-          </Panel>
-
-          {/* Macro detail panels — only if enhanced regime data is available */}
-          {isEnhanced && (
-            <>
-              <Panel
-                id="advice"
-                title="RECOMMENDED ALLOCATION"
-                tooltip="Allocation across Classes A–D derived from the current Fed Pressure Score (FPS) and Growth Pulse Score (GPS). Updates as macro data shifts."
-              >
-                <AllocationChart
-                  allocation={data.regime.allocation}
-                  allocationSteps={data.regime.allocation_steps}
-                />
-              </Panel>
-
-              <Panel
-                id="macro"
-                title="MACRO ENGINE"
-                tooltip="FPS / GPS scores driving the regime classification, plus the underlying 13 indicators with per-indicator contributions to each score."
-              >
-                {/* Top: scores side-by-side with interpretation bullets — no wasted row. */}
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1.1fr] gap-x-5 gap-y-3 items-start">
-                  <ScoreGauge
-                    label="Fed Pressure Score (FPS)"
-                    value={data.regime.scores.fps}
-                    interpretation={data.regime.scores.fps_interpretation}
-                  />
-                  <ScoreGauge
-                    label="Growth Pulse Score (GPS)"
-                    value={data.regime.scores.gps}
-                    interpretation={data.regime.scores.gps_interpretation}
-                  />
-                  <div className="lg:pl-4 lg:border-l border-line/40">
-                    <InterpretationPanel messages={data.regime.interpretation} />
-                  </div>
-                </div>
-
-                {/* Split indicator grid sits below, two halves side by side. */}
-                <div className="mt-3 pt-3 border-t border-line/40">
-                  <IndicatorGrid
-                    fpsBreakdown={data.regime.breakdown.fps}
-                    gpsBreakdown={data.regime.breakdown.gps}
-                  />
-                </div>
-              </Panel>
-            </>
-          )}
-
-          {/* HOLDINGS */}
-          <StockTable
-            stocks={data.stocks}
-            onDelete={data.deleteStock}
-            onEditNotes={(ticker, notes) => setEditingNotes({ ticker, notes })}
-            macroRefresh={data.regime?.refresh || null}
-            onAdd={data.addStock}
-            adding={data.adding}
+          {/* Layout shell — the only thing that changes when LayoutSwitch fires */}
+          <ActiveLayout
+            data={data}
             registerSearchInput={registerSearchInput}
             registerRowScroll={registerRowScroll}
+            onEditNotes={onEditNotes}
           />
 
           <footer className="font-mono text-[10px] text-muted/60 pt-6 pb-2 flex items-center gap-2 smallcaps-tight">
@@ -242,7 +186,7 @@ function App() {
             deleteStock: data.deleteStock,
             refresh: data.refreshAll,
             setTheme,
-            setDensity,
+            setLayout,
             goto: jumpTo,
             jumpTo: jumpToTicker
           }}

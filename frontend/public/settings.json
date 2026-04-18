@@ -1,7 +1,7 @@
 {
-  "$schema-note": "Edit this file to customize Macropulse. Palette values are space-separated rgb triplets (NOT hex), so Tailwind opacity utilities like text-up/40 work. activeTheme + density + effects can also be flipped at runtime via the topbar; user choices override this file via localStorage.",
+  "$schema-note": "Edit this file to customize Macropulse. Palette values are space-separated rgb triplets (NOT hex), so Tailwind opacity utilities like text-up/40 work. activeTheme + layout + effects can also be flipped at runtime via the topbar; user choices override this file via localStorage. layout: 'cockpit' | 'panel' | 'floor'.",
   "activeTheme": "phosphor",
-  "density": "normal",
+  "layout": "panel",
   "fontScale": 1.0,
   "effects": {
     "scanlines": true,

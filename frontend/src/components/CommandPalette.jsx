@@ -5,7 +5,7 @@ import { cx } from '../utils/classes';
 const COMMANDS = [
   { id: 'refresh',    name: '/refresh',         hint: 'Refresh quotes · details · macro' },
   { id: 'theme',      name: '/theme <id>',      hint: 'Switch palette: phosphor · amber · slate · paper' },
-  { id: 'density',    name: '/density <x>',     hint: 'compact · normal · comfortable' },
+  { id: 'layout',     name: '/layout <x>',      hint: 'cockpit · panel · floor' },
   { id: 'goto',       name: '/goto <section>',  hint: 'home · advice · macro · holdings' },
   { id: 'delete',     name: '/delete <ticker>', hint: 'Remove a ticker after confirm' }
 ];
@@ -47,11 +47,11 @@ function CommandPalette({ open, onClose, tickers = [], handlers = {} }) {
           .filter((id) => fuzzyMatch(arg, id))
           .map((id) => ({ kind: 'exec', label: `/theme ${id}`, hint: 'Switch palette', run: () => handlers.setTheme?.(id) }));
       }
-      if (head === 'density') {
-        const ids = ['compact', 'normal', 'comfortable'];
+      if (head === 'layout') {
+        const ids = ['cockpit', 'panel', 'floor'];
         return ids
           .filter((id) => fuzzyMatch(arg, id))
-          .map((id) => ({ kind: 'exec', label: `/density ${id}`, hint: 'Set density', run: () => handlers.setDensity?.(id) }));
+          .map((id) => ({ kind: 'exec', label: `/layout ${id}`, hint: 'Switch dashboard layout', run: () => handlers.setLayout?.(id) }));
       }
       if (head === 'goto') {
         const ids = ['home', 'advice', 'macro', 'holdings'];

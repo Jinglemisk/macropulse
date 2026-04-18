@@ -53,5 +53,6 @@ frontend/.vite/
 
 # Ad-hoc screenshots / image backups
 revamp-*.png
+layout-*.png
 *-backup.jpeg
 *-backup.png

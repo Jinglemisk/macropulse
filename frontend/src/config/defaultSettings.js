@@ -2,7 +2,7 @@
 // Keep palette keys in sync with public/settings.json.
 export const defaultSettings = {
   activeTheme: 'phosphor',
-  density: 'normal',
+  layout: 'panel',
   fontScale: 1.0,
   effects: { scanlines: true, glow: true, grain: false },
   themes: {

@@ -14,7 +14,7 @@ export function KeyboardShortcutsProvider({
   jumps = {}, // { h: 'home', m: 'macro', a: 'advice', r: 'home' }
   children
 }) {
-  const { cycleTheme, cycleDensity } = useTheme();
+  const { cycleTheme, cycleLayout } = useTheme();
   const [chord, setChord] = useState(null); // { key: 'g', expires: ts }
   const chordTimeout = useRef(null);
 
@@ -69,7 +69,7 @@ export function KeyboardShortcutsProvider({
       if (!chord && !e.metaKey && !e.ctrlKey && !e.altKey) {
         if (e.key === 'r') { e.preventDefault(); onRefresh?.(); return; }
         if (e.key === 't') { e.preventDefault(); cycleTheme();    return; }
-        if (e.key === 'd') { e.preventDefault(); cycleDensity();  return; }
+        if (e.key === 'd') { e.preventDefault(); cycleLayout();   return; }
       }
 
       // Chord init: 'g'
@@ -95,7 +95,7 @@ export function KeyboardShortcutsProvider({
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [chord, clearChord, cycleDensity, cycleTheme, jumps, onFocusSearch, onOpenPalette, onOpenShortcuts, onRefresh]);
+  }, [chord, clearChord, cycleLayout, cycleTheme, jumps, onFocusSearch, onOpenPalette, onOpenShortcuts, onRefresh]);
 
   return (
     <Ctx.Provider value={{ chord }}>
