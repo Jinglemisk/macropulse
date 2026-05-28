@@ -13,6 +13,14 @@ const PYTHON_CMD = process.env.PYTHON_PATH || 'python3';
 // Timeout for Python process (30 seconds)
 const TIMEOUT_MS = parseInt(process.env.OPENBB_TIMEOUT_MS) || 30000;
 
+function buildPythonEnv() {
+  return {
+    ...process.env,
+    OPENBB_FMP_API_KEY: process.env.OPENBB_FMP_API_KEY || process.env.FMP_API_KEY || '',
+    OPENBB_FRED_API_KEY: process.env.OPENBB_FRED_API_KEY || process.env.FRED_API_KEY || ''
+  };
+}
+
 /**
  * Execute Python adapter script
  * @param {string[]} args - Command-line arguments
@@ -26,7 +34,7 @@ async function executePythonScript(args) {
       {
         timeout: TIMEOUT_MS,
         maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large responses
-        env: process.env  // Pass environment variables to Python (includes OPENBB_* keys)
+        env: buildPythonEnv()
       }
     );
 

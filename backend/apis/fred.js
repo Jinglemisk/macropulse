@@ -1,6 +1,12 @@
-const openbb = require('./openbb');
+const fetch = require('node-fetch');
+const config = require('../config');
 const db = require('../database');
 const { updateMovingAverages } = require('../utils/movingAverages');
+
+const FRED_TIMEOUT_MS = Number.parseInt(
+  process.env.FRED_TIMEOUT_MS || process.env.OPENBB_TIMEOUT_MS || '30000',
+  10
+);
 
 const MACRO_SERIES = [
   { id: 'WALCL', field: 'walcl', cadenceDays: 21 },
@@ -20,12 +26,73 @@ const MACRO_SERIES = [
 
 function addToMap(dateMap, data, field) {
   data.forEach(observation => {
+    const value = Number.parseFloat(observation.value);
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
     if (!dateMap.has(observation.date)) {
       dateMap.set(observation.date, {});
     }
 
-    dateMap.get(observation.date)[field] = parseFloat(observation.value);
+    dateMap.get(observation.date)[field] = value;
   });
+}
+
+async function getFredSeries(seriesId, startDate, endDate) {
+  if (!config.apiKeys.fred) {
+    throw new Error('FRED_API_KEY is not configured');
+  }
+
+  console.log(`🔄 Fetching FRED series ${seriesId}...`);
+
+  const params = new URLSearchParams({
+    series_id: seriesId,
+    api_key: config.apiKeys.fred,
+    file_type: 'json',
+    observation_start: startDate,
+    observation_end: endDate
+  });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FRED_TIMEOUT_MS);
+  let response;
+
+  try {
+    response = await fetch(
+      `https://api.stlouisfed.org/fred/series/observations?${params.toString()}`,
+      { signal: controller.signal }
+    );
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error(`FRED ${seriesId} request timed out after ${FRED_TIMEOUT_MS}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`FRED ${seriesId} request failed (${response.status}): ${body.slice(0, 200)}`);
+  }
+
+  const payload = await response.json();
+  if (payload.error_code) {
+    throw new Error(`FRED ${seriesId} error ${payload.error_code}: ${payload.error_message}`);
+  }
+
+  const observations = Array.isArray(payload.observations) ? payload.observations : [];
+  const data = observations
+    .filter(observation => observation.value !== '.')
+    .map(observation => ({
+      date: observation.date,
+      value: observation.value,
+      series_id: seriesId
+    }));
+
+  console.log(`✅ Got ${data.length} data points for ${seriesId}`);
+  return data;
 }
 
 function daysBetween(laterDate, earlierDate) {
@@ -62,7 +129,11 @@ function buildSeriesStatus(seriesFetchResults, asOfDate) {
   const staleSeries = [];
 
   for (const config of MACRO_SERIES) {
-    const fetchResult = seriesFetchResults[config.id];
+    const fetchResult = seriesFetchResults[config.id] || {
+      status: 'failed',
+      pointsFetched: 0,
+      error: 'Series was not attempted'
+    };
     const snapshot = getSeriesSnapshot(config, asOfDate);
     const hadSuccessfulFetch = fetchResult.status === 'success';
 
@@ -131,10 +202,10 @@ async function updateMacroData(days = 365) {
   const endDate = new Date().toISOString().split('T')[0];
   const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-  console.log(`📊 Fetching ${MACRO_SERIES.length} macro series from ${startDate} to ${endDate} via OpenBB...`);
+  console.log(`📊 Fetching ${MACRO_SERIES.length} macro series from ${startDate} to ${endDate} via FRED...`);
 
   const fetchResults = await Promise.allSettled(
-    MACRO_SERIES.map(series => openbb.getFredSeries(series.id, startDate, endDate))
+    MACRO_SERIES.map(series => getFredSeries(series.id, startDate, endDate))
   );
 
   const dateMap = new Map();

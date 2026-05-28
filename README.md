@@ -20,7 +20,7 @@ Not a broker, not a backtester, not multi-user.
 | Layer        | Tech                                                  |
 | ------------ | ----------------------------------------------------- |
 | Backend      | Node 18 + Express, `better-sqlite3`                   |
-| Data bridge  | Python 3.11 + OpenBB (FMP · yfinance · Intrinio · FRED) |
+| Data bridge  | Direct FRED HTTP for macro · Python 3.11 + OpenBB for equity provider calls |
 | Frontend     | React 18 + Vite + Tailwind, runtime-themed via CSS vars |
 | Persistence  | SQLite (`data/stocks.db`) + `localStorage` for prefs   |
 
@@ -30,20 +30,16 @@ Not a broker, not a backtester, not multi-user.
 git clone <repo>
 cd portfolio-app
 
-npm install
-(cd frontend && npm install)
+npm run setup              # root deps · frontend deps · Python venv · DB
 
-python3 -m venv venv && source venv/bin/activate
-pip install --upgrade pip && pip install -r requirements.txt
+# Edit .env and set FMP_API_KEY + FRED_API_KEY
 
-cp .env.example .env       # set FMP_API_KEY + FRED_API_KEY
-
-npm run init-db
 npm run fetch-macro
-npm run dev:all            # backend :8345 · frontend :5173
+npm run doctor             # verifies keys, deps, DB, macro data, ports
+npm run dev:all            # backend :8345 · frontend :4949
 ```
 
-Open `http://localhost:5173`.
+Open `http://localhost:4949`.
 
 ## Environment
 
@@ -53,12 +49,12 @@ All settings live in `.env`. The non-obvious ones:
 | ---------------- | --------------------------------------------------- |
 | `FMP_API_KEY`    | Primary fundamentals / quotes / profiles provider   |
 | `FRED_API_KEY`   | Macro time series                                   |
-| `PYTHON_PATH`    | Must point at the venv's `python` (OpenBB lives there) |
+| `PYTHON_PATH`    | Must point at the venv's `python` for OpenBB equity calls |
 | `PORT`           | Backend port (default `8345`)                       |
 | `DATABASE_PATH`  | SQLite file location                                |
 | `PRIMARY_*` / `FALLBACK_*` | Per-domain provider chains (see `.env.example`) |
 
-`OPENBB_FMP_API_KEY` and `OPENBB_FRED_API_KEY` should mirror the non-prefixed values.
+`OPENBB_FMP_API_KEY` and `OPENBB_FRED_API_KEY` are optional mirrors. If omitted, the backend derives them from `FMP_API_KEY` and `FRED_API_KEY` before spawning Python provider calls.
 
 ## UI
 
@@ -140,6 +136,7 @@ Stock data and macro data refresh independently.
 # UI button (or `r`) — quotes, details, macro in one run
 # CLI equivalents:
 npm run fetch-macro      # macro only (FRED series)
+npm run doctor           # setup check: deps, env, DB, macro rows, ports
 ```
 
 Cadence: stock refresh after earnings or on demand; macro refresh weekly or after major releases.
@@ -166,7 +163,7 @@ portfolio-app/
 ├── docs/
 │   ├── FPS_GPS_IMPLEMENTATION.md
 │   └── how-to-invest.md
-├── scripts/{initDb,fetchMacroData}.js
+├── scripts/{setup,doctor,initDb,fetchMacroData}.js
 ├── layout.md                         # ASCII wireframes for all three layouts
 ├── requirements.txt · .env.example
 ```
@@ -175,10 +172,12 @@ portfolio-app/
 
 | Symptom                            | Fix                                                                                        |
 | ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| `npm run dev:all` stops in preflight | Run `npm run doctor`; follow the first `[fail]` message.                                  |
+| Missing frontend/root dependency   | Run `npm run setup` or `npm install && npm --prefix frontend install`.                     |
 | `No module named openbb`           | Activate `venv`, reinstall `requirements.txt`, point `PYTHON_PATH` at `./venv/bin/python`. |
 | Refresh stalls / provider errors   | Check `PRIMARY_*` and `FALLBACK_*` chains; final fundamentals fallback hits Yahoo direct.  |
 | `MACRO REGIME UNAVAILABLE` banner  | Run `npm run fetch-macro`.                                                                 |
-| Want a clean DB                    | `rm -f data/stocks.db data/stocks.db-shm data/stocks.db-wal && npm run init-db && npm run fetch-macro` |
+| Want a clean DB                    | Delete `data/stocks.db*`, then run `npm run init-db && npm run fetch-macro`.              |
 | Theme / layout changes don't stick | Clear `localStorage` key `macropulse:prefs`.                                               |
 
 ## Limits

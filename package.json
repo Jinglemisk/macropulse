@@ -4,6 +4,9 @@
   "description": "Investment dashboard for tracking stock classifications across macro regimes",
   "main": "backend/server.js",
   "scripts": {
+    "setup": "node scripts/setup.js",
+    "doctor": "node scripts/doctor.js",
+    "predev:all": "node scripts/doctor.js --preflight",
     "start": "node backend/server.js",
     "dev": "node backend/server.js",
     "init-db": "node scripts/initDb.js",

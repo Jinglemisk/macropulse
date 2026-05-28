@@ -7,6 +7,8 @@
 
 console.log('Initializing database...\n');
 
+require('dotenv').config();
+
 // Just require the database module - it will create tables automatically
 require('../backend/database');
 
