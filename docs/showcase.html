@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Macropulse — The Liquidity Playbook</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/* ============ TOKENS ============ */
+:root, :root[data-theme="light"]{
+  --bg:#e8e7e0; --bg-tint:#ecebd9; --surface:#f5f4ef; --surface-2:#dedcd1;
+  --text:#1a2130; --text-soft:#565d6b; --text-faint:#8a8f9a;
+  --line:rgba(26,33,48,.14); --line-strong:rgba(26,33,48,.28);
+  --accent:#a9781f; --accent-bright:#c79a3e; --accent-wash:rgba(169,120,31,.10);
+  --liq-high:#3f8058; --liq-mid:#b0862f; --liq-low:#ab4a3c;
+  --shadow:0 1px 2px rgba(26,33,48,.05),0 8px 30px rgba(26,33,48,.07);
+  --grid-line:rgba(26,33,48,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1320; --bg-tint:#101827; --surface:#151d2d; --surface-2:#1c2536;
+    --text:#e8eaee; --text-soft:#9aa3b2; --text-faint:#6a7385;
+    --line:rgba(255,255,255,.10); --line-strong:rgba(255,255,255,.22);
+    --accent:#d2a84e; --accent-bright:#e3bd63; --accent-wash:rgba(210,168,78,.12);
+    --liq-high:#57a077; --liq-mid:#cfa64c; --liq-low:#c8604f;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 34px rgba(0,0,0,.4);
+    --grid-line:rgba(255,255,255,.05);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1320; --bg-tint:#101827; --surface:#151d2d; --surface-2:#1c2536;
+  --text:#e8eaee; --text-soft:#9aa3b2; --text-faint:#6a7385;
+  --line:rgba(255,255,255,.10); --line-strong:rgba(255,255,255,.22);
+  --accent:#d2a84e; --accent-bright:#e3bd63; --accent-wash:rgba(210,168,78,.12);
+  --liq-high:#57a077; --liq-mid:#cfa64c; --liq-low:#c8604f;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 34px rgba(0,0,0,.4);
+  --grid-line:rgba(255,255,255,.05);
+}
+
+/* ============ BASE ============ */
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:17px; line-height:1.65; letter-spacing:.005em;
+  -webkit-font-smoothing:antialiased;
+  background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
+  background-size:44px 44px;
+}
+.serif{font-family:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif}
+.mono{font-family:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace}
+h1,h2,h3{font-family:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;font-weight:600;text-wrap:balance;line-height:1.12;margin:0}
+p{margin:0}
+a{color:var(--accent);text-decoration:none}
+.tnum{font-variant-numeric:tabular-nums}
+
+.wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+section{padding:78px 0;border-top:1px solid var(--line)}
+
+.eyebrow{
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;font-weight:600;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--accent);
+  display:flex;align-items:center;gap:10px;
+}
+.eyebrow::before{content:"";width:26px;height:1px;background:var(--accent);opacity:.7}
+.sec-head{max-width:60ch;margin-bottom:44px}
+.sec-head h2{font-size:clamp(28px,4vw,40px);margin:16px 0 14px}
+.sec-head p{color:var(--text-soft);font-size:18px}
+
+/* ============ TOP NAV ============ */
+.nav{
+  position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
+  background:color-mix(in srgb,var(--bg) 84%,transparent);
+  border-bottom:1px solid var(--line);
+}
+.nav-in{max-width:1080px;margin:0 auto;padding:12px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:.02em}
+.brand .mark{
+  width:26px;height:26px;border-radius:6px;display:grid;place-items:center;flex:none;
+  background:var(--accent);color:var(--bg);font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:700;
+}
+.nav-links{display:flex;gap:6px;flex-wrap:wrap}
+.nav-links a{
+  font-family:ui-monospace,Menlo,monospace;font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--text-soft);padding:6px 10px;border-radius:6px;transition:background .2s,color .2s;
+}
+.nav-links a:hover{background:var(--accent-wash);color:var(--text)}
+@media (max-width:720px){.nav-links{display:none}}
+
+/* ============ HERO ============ */
+.hero{padding:64px 0 70px;position:relative;overflow:hidden;border-top:none}
+.hero-line{position:absolute;inset:auto 0 0 0;height:180px;width:100%;opacity:.5;pointer-events:none;z-index:0}
+.hero > *{position:relative;z-index:1}
+.kicker{
+  font-family:ui-monospace,Menlo,monospace;font-size:12.5px;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:22px;
+}
+.hero h1{font-size:clamp(40px,7.2vw,78px);letter-spacing:-.01em;max-width:15ch}
+.hero .thesis{font-size:clamp(19px,2.4vw,23px);color:var(--text-soft);max-width:54ch;margin-top:24px;line-height:1.5}
+.hero .thesis b{color:var(--text);font-weight:600}
+.source{
+  margin-top:30px;display:inline-flex;align-items:center;gap:12px;flex-wrap:wrap;
+  font-family:ui-monospace,Menlo,monospace;font-size:13px;color:var(--text-soft);
+  padding:10px 14px;border:1px solid var(--line);border-radius:9px;background:var(--surface);
+}
+.source .dot{width:7px;height:7px;border-radius:50%;background:var(--liq-high)}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:48px}
+.stat{border:1px solid var(--line);border-radius:12px;padding:18px 18px 16px;background:var(--surface);box-shadow:var(--shadow)}
+.stat .n{font-family:"Iowan Old Style",Palatino,Georgia,serif;font-size:clamp(26px,3.4vw,34px);font-weight:600;line-height:1;letter-spacing:-.01em}
+.stat .l{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint);margin-top:9px}
+@media (max-width:720px){.stats{grid-template-columns:repeat(2,1fr)}}
+
+/* ============ LEVERS ============ */
+.levers{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.lever{border:1px solid var(--line);border-radius:14px;padding:26px;background:var(--surface);box-shadow:var(--shadow)}
+.lever .tick{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:600;letter-spacing:.05em;
+  color:var(--accent);background:var(--accent-wash);border:1px solid var(--line);padding:3px 8px;border-radius:6px;margin-bottom:14px}
+.lever h3{font-size:23px;margin-bottom:10px}
+.lever p{color:var(--text-soft);font-size:15.5px;margin-bottom:14px}
+.lever .rows{display:flex;flex-direction:column;gap:8px}
+.lever .row{display:flex;gap:10px;align-items:baseline;font-size:14.5px}
+.lever .row .up{color:var(--liq-high);font-weight:600;font-family:ui-monospace,Menlo,monospace;flex:none;width:64px}
+.lever .row .dn{color:var(--liq-low);font-weight:600;font-family:ui-monospace,Menlo,monospace;flex:none;width:64px}
+@media (max-width:720px){.levers{grid-template-columns:1fr}}
+
+/* ============ MATRIX ============ */
+.matrix-shell{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:stretch}
+.axis-y{display:flex;flex-direction:column;justify-content:space-between;align-items:center}
+.axis-y span{writing-mode:vertical-rl;transform:rotate(180deg);font-family:ui-monospace,Menlo,monospace;
+  font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint)}
+.axis-y .qe{color:var(--liq-high)} .axis-y .qt{color:var(--liq-low)}
+.matrix{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.axis-x{display:flex;justify-content:space-between;font-family:ui-monospace,Menlo,monospace;
+  font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);
+  padding:10px 4px 0 46px;grid-column:1 / -1}
+.quad{
+  position:relative;border:1px solid var(--line);border-radius:14px;padding:20px;background:var(--surface);
+  box-shadow:var(--shadow);overflow:hidden;transition:transform .25s ease,border-color .25s;
+}
+.quad:hover{transform:translateY(-3px);border-color:var(--line-strong)}
+.quad::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--q)}
+.quad .qtag{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint)}
+.quad h3{font-size:20px;margin:5px 0 2px}
+.quad .liqword{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:600;color:var(--q);letter-spacing:.03em}
+.quad .chips{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+.chip{font-family:ui-monospace,Menlo,monospace;font-size:11px;padding:3px 8px;border-radius:20px;border:1px solid var(--line);color:var(--text-soft);white-space:nowrap}
+.quad .strat{font-size:14px;color:var(--text-soft);line-height:1.5;min-height:63px}
+.quad .foot{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.quad .arche{display:flex;align-items:center;gap:11px}
+.arche .big{font-family:"Iowan Old Style",Palatino,Georgia,serif;font-size:38px;font-weight:600;line-height:.9;color:var(--q)}
+.arche .cap{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint)}
+.quad .pos{text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--text)}
+.quad .pos small{display:block;color:var(--text-faint);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+.liqbar{display:flex;gap:3px;margin:10px 0 2px}
+.liqbar i{height:5px;flex:1;border-radius:3px;background:var(--line-strong);opacity:.4}
+.liqbar i.on{opacity:1;background:var(--q)}
+@media (max-width:640px){.matrix{grid-template-columns:1fr}.axis-y{flex-direction:row;writing-mode:horizontal-tb}.axis-y span{writing-mode:horizontal-tb;transform:none}.matrix-shell{grid-template-columns:1fr}.axis-x{padding-left:4px}}
+
+/* ============ ARCHETYPES TABLE ============ */
+.table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{text-align:left;padding:15px 18px;border-bottom:1px solid var(--line);font-size:14.5px}
+thead th{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint);font-weight:600}
+tbody tr:last-child td{border-bottom:none}
+tbody tr{transition:background .15s}
+tbody tr:hover{background:var(--accent-wash)}
+td .aid{font-family:"Iowan Old Style",Palatino,Georgia,serif;font-size:22px;font-weight:600;color:var(--accent)}
+td.num{font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;color:var(--text-soft)}
+.best{font-family:ui-monospace,Menlo,monospace;font-size:11px;padding:3px 9px;border-radius:20px;background:var(--accent-wash);color:var(--accent);border:1px solid var(--line);white-space:nowrap}
+
+/* ============ VALUATION CARDS ============ */
+.vcards{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+.vcard{border:1px solid var(--line);border-radius:14px;padding:24px;background:var(--surface);box-shadow:var(--shadow)}
+.vcard .formula{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:var(--accent);background:var(--accent-wash);
+  padding:9px 12px;border-radius:8px;margin:12px 0 14px;display:inline-block;border:1px solid var(--line)}
+.vcard h3{font-size:21px}
+.vcard p{color:var(--text-soft);font-size:15px;margin-top:8px}
+.vcard .pt{color:var(--text);font-weight:600}
+@media (max-width:720px){.vcards{grid-template-columns:1fr}}
+
+/* ============ INDICATOR GRID ============ */
+.igrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.icard{border:1px solid var(--line);border-radius:13px;padding:18px;background:var(--surface);box-shadow:var(--shadow);display:flex;flex-direction:column}
+.icard .top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px}
+.icard h3{font-size:16.5px;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-weight:650;line-height:1.25}
+.icard .cat{font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);margin-top:8px}
+.ticker{font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:600;padding:3px 7px;border-radius:6px;
+  background:var(--surface-2);color:var(--text-soft);border:1px solid var(--line);white-space:nowrap;flex:none}
+.ticker.proxy{color:var(--liq-mid)}
+.gauge{margin:14px 0 6px}
+.gauge .bar{display:flex;height:8px;border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+.gauge .bar i{flex:1}
+.gauge .labs{display:flex;justify-content:space-between;margin-top:6px;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:var(--text-faint)}
+.reax{margin-top:auto;padding-top:12px;font-size:12.5px;color:var(--text-soft);line-height:1.45}
+.reax b{color:var(--text);font-weight:600}
+.lead{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:6px;vertical-align:middle}
+@media (max-width:900px){.igrid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.igrid{grid-template-columns:1fr}}
+
+/* ============ CHECKLIST ============ */
+.check{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.citem{display:flex;gap:16px;border:1px solid var(--line);border-radius:12px;padding:18px 20px;background:var(--surface);box-shadow:var(--shadow)}
+.citem .no{font-family:"Iowan Old Style",Palatino,Georgia,serif;font-size:26px;font-weight:600;color:var(--liq-high);line-height:1;flex:none;width:26px}
+.citem h3{font-size:16.5px;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;font-weight:650}
+.citem p{font-size:13.5px;color:var(--text-soft);margin-top:5px}
+.citem .m{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--accent);margin-top:8px;display:inline-block}
+@media (max-width:720px){.check{grid-template-columns:1fr}}
+.override{margin-top:20px;border:1px solid var(--line);border-left:3px solid var(--liq-low);border-radius:12px;padding:22px 24px;background:var(--surface)}
+.override h3{font-size:18px;margin-bottom:6px}
+.override>p{color:var(--text-soft);font-size:14.5px;margin-bottom:16px;max-width:66ch}
+.omons{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.omon{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--bg)}
+.omon .h{display:flex;align-items:center;gap:8px;font-weight:650;font-size:14px;margin-bottom:6px}
+.omon .h .warn{color:var(--liq-low)}
+.omon p{font-size:12.5px;color:var(--text-soft);line-height:1.45}
+.omon .t{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:var(--accent);margin-top:8px;display:block}
+@media (max-width:720px){.omons{grid-template-columns:1fr}}
+
+/* ============ MINDSET ============ */
+.principles{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}
+.pr{display:grid;grid-template-columns:70px 1fr;gap:8px;padding:22px 24px;border-bottom:1px solid var(--line);transition:background .15s}
+.pr:last-child{border-bottom:none}
+.pr:hover{background:var(--accent-wash)}
+.pr .pn{font-family:"Iowan Old Style",Palatino,Georgia,serif;font-size:30px;font-weight:600;color:var(--accent);line-height:.9}
+.pr h3{font-size:19px;margin-bottom:6px}
+.pr p{color:var(--text-soft);font-size:15px;max-width:70ch}
+.pr p em{color:var(--text);font-style:italic}
+
+/* ============ FOOTER ============ */
+.foot{border-top:1px solid var(--line);padding:54px 0 70px}
+.foot .next{border:1px solid var(--line);border-radius:14px;padding:26px 28px;background:var(--surface);box-shadow:var(--shadow);margin-bottom:34px}
+.foot .next .eyebrow{margin-bottom:12px}
+.foot .next h3{font-size:23px;margin-bottom:10px}
+.foot .next p{color:var(--text-soft);max-width:64ch}
+.foot .meta{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--text-faint)}
+.disclaimer{margin-top:18px;font-size:12.5px;color:var(--text-faint);max-width:70ch;line-height:1.5}
+
+/* ============ REVEAL ============ */
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){
+  .reveal{opacity:1;transform:none;transition:none}
+  .hero-line .draw{animation:none;stroke-dashoffset:0}
+}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <div class="brand"><span class="mark">₣</span> The Liquidity Playbook</div>
+    <div class="nav-links">
+      <a href="#fed">The Fed</a>
+      <a href="#archetypes">Archetypes</a>
+      <a href="#valuation">Valuation</a>
+      <a href="#indicators">Indicators</a>
+      <a href="#timing">Timing</a>
+      <a href="#mindset">Mindset</a>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <header class="hero">
+    <svg class="hero-line" viewBox="0 0 1200 180" preserveAspectRatio="none" aria-hidden="true">
+      <path class="draw" d="M0,140 C120,138 160,90 240,96 C320,102 340,150 420,150 C500,150 520,60 600,54 C680,48 700,120 780,116 C860,112 880,40 960,30 C1040,20 1080,70 1200,58"
+        fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+    </svg>
+    <div class="kicker">Macropulse · The liquidity playbook</div>
+    <h1 class="serif">Read the Fed.<br>Position accordingly.</h1>
+    <p class="thesis">Since 2008, the dominant force in equities isn't earnings — it's <b>liquidity</b>. Macropulse reduces the strategy to a repeatable system: read two Fed levers, place the market on a four-regime map, and hold the stock profile built to win there.</p>
+    <div class="stats">
+      <div class="stat"><div class="n tnum">4</div><div class="l">Liquidity regimes</div></div>
+      <div class="stat"><div class="n tnum">10</div><div class="l">Macro indicators</div></div>
+      <div class="stat"><div class="n tnum">15</div><div class="l">FRED series</div></div>
+      <div class="stat"><div class="n tnum">5</div><div class="l">Signal checklist</div></div>
+    </div>
+  </header>
+
+  <!-- THE TWO LEVERS -->
+  <section id="fed">
+    <div class="sec-head reveal">
+      <div class="eyebrow">01 — The two levers</div>
+      <h2 class="serif">The Fed controls liquidity with two dials</h2>
+      <p>Learn to read both and you can anticipate the market's direction. One sets the <em>price</em> of money; the other sets its <em>quantity</em>.</p>
+    </div>
+    <div class="levers reveal">
+      <div class="lever">
+        <span class="tick mono">FEDFUNDS</span>
+        <h3 class="serif">The policy rate</h3>
+        <p>The base price of money — every loan, bond, and mortgage is priced off it.</p>
+        <div class="rows">
+          <div class="row"><span class="up mono">LOW ↓</span><span>Cheap money → <b>more liquidity</b> (cuts in 2008, 2020)</span></div>
+          <div class="row"><span class="dn mono">HIGH ↑</span><span>Expensive money → <b>less liquidity</b> (hikes in 2004, 2022)</span></div>
+        </div>
+      </div>
+      <div class="lever">
+        <span class="tick mono">WALCL</span>
+        <h3 class="serif">The balance sheet</h3>
+        <p>The assets the Fed holds — mostly Treasuries and mortgage-backed securities.</p>
+        <div class="rows">
+          <div class="row"><span class="up mono">QE ↑</span><span>Buying bonds pushes cash in → <b>more liquidity</b></span></div>
+          <div class="row"><span class="dn mono">QT ↓</span><span>Selling / runoff drains cash → <b>less liquidity</b></span></div>
+        </div>
+      </div>
+    </div>
+    <p class="reveal serif" style="margin-top:26px;font-size:19px;color:var(--text-soft);max-width:62ch">
+      Most liquid market = <b style="color:var(--liq-high)">low rate + rising balance sheet</b>. &nbsp;Least liquid = <b style="color:var(--liq-low)">high rate + shrinking balance sheet</b>.
+    </p>
+  </section>
+
+  <!-- THE MATRIX -->
+  <section>
+    <div class="sec-head reveal">
+      <div class="eyebrow">02 — The chessboard</div>
+      <h2 class="serif">The 2×2 liquidity matrix</h2>
+      <p>Plot the two levers against each other and four regimes appear. Where you are determines what you should own — and how much.</p>
+    </div>
+    <div class="matrix-shell reveal">
+      <div class="axis-y" aria-hidden="true">
+        <span class="qe">Balance sheet rising · QE</span>
+        <span class="qt">Shrinking · QT</span>
+      </div>
+      <div class="matrix">
+        <!-- Q2 -->
+        <div class="quad" style="--q:var(--liq-mid)">
+          <div class="qtag mono">Q2 · High rate + QE</div>
+          <h3 class="serif">In-between</h3>
+          <div class="liqword mono">SOME LIQUIDITY</div>
+          <div class="liqbar" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i></div>
+          <div class="chips"><span class="chip">Rate high ↑</span><span class="chip">Balance sheet ↑</span></div>
+          <div class="strat">Selective. Favor growth with <em>moderate</em> leverage that can survive high rates.</div>
+          <div class="foot">
+            <div class="arche"><span class="big">B</span><span class="cap">Moderate growth<br>+ some leverage</span></div>
+            <div class="pos"><small>Sizing</small>≤ 50% / sideline</div>
+          </div>
+        </div>
+        <!-- Q1 -->
+        <div class="quad" style="--q:var(--liq-high)">
+          <div class="qtag mono">Q1 · Low rate + QE</div>
+          <h3 class="serif">Most liquid ★</h3>
+          <div class="liqword mono">ABUNDANT LIQUIDITY</div>
+          <div class="liqbar" aria-hidden="true"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+          <div class="chips"><span class="chip">Rate low ↓</span><span class="chip">Balance sheet ↑</span></div>
+          <div class="strat">Chase pure revenue growth; ignore profitability — cheap money keeps everyone alive.</div>
+          <div class="foot">
+            <div class="arche"><span class="big">D</span><span class="cap">Hyper-growth<br>unprofitable</span></div>
+            <div class="pos"><small>Sizing</small>100% + leverage</div>
+          </div>
+        </div>
+        <!-- Q4 -->
+        <div class="quad" style="--q:var(--liq-low)">
+          <div class="qtag mono">Q4 · High rate + QT</div>
+          <h3 class="serif">Least liquid ✕</h3>
+          <div class="liqword mono">SCARCE LIQUIDITY</div>
+          <div class="liqbar" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
+          <div class="chips"><span class="chip">Rate high ↑</span><span class="chip">Balance sheet ↓</span></div>
+          <div class="strat">Defensive. High-margin, low-valuation, low-debt names — pharma, food &amp; beverage, manufacturing.</div>
+          <div class="foot">
+            <div class="arche"><span class="big">A</span><span class="cap">Stable, cheap<br>no debt</span></div>
+            <div class="pos"><small>Sizing</small>≤ 20% / sit out</div>
+          </div>
+        </div>
+        <!-- Q3 -->
+        <div class="quad" style="--q:var(--liq-mid)">
+          <div class="qtag mono">Q3 · Low rate + QT</div>
+          <h3 class="serif">In-between</h3>
+          <div class="liqword mono">SOME LIQUIDITY</div>
+          <div class="liqbar" aria-hidden="true"><i class="on"></i><i class="on"></i><i></i><i></i></div>
+          <div class="chips"><span class="chip">Rate low ↓</span><span class="chip">Balance sheet ↓</span></div>
+          <div class="strat">Selective. Growth <em>and</em> profitability; leveraged growth benefits from cheaper refinancing.</div>
+          <div class="foot">
+            <div class="arche"><span class="big">C</span><span class="cap">High growth<br>high leverage</span></div>
+            <div class="pos"><small>Sizing</small>≤ 50% / sideline</div>
+          </div>
+        </div>
+        <div class="axis-x" aria-hidden="true"><span>◄ High rate</span><span>Low rate ►</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHETYPES -->
+  <section id="archetypes">
+    <div class="sec-head reveal">
+      <div class="eyebrow">03 — Stock selection</div>
+      <h2 class="serif">Four archetypes, four metrics</h2>
+      <p>Every stock reduces to four numbers: revenue growth, earnings growth, forward P/E, and Debt/EBITDA. They define the profiles above.</p>
+    </div>
+    <div class="table-scroll reveal">
+      <table>
+        <thead>
+          <tr><th>Archetype</th><th>Profile</th><th>Rev</th><th>EPS</th><th>Fwd&nbsp;P/E</th><th>Debt/EBITDA</th><th>Wins in</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="aid">A</span></td><td>Stable, no debt, cheap</td><td class="num">5%</td><td class="num">5%</td><td class="num">10×</td><td class="num">1×</td><td><span class="best">Q4 · least liquid</span></td></tr>
+          <tr><td><span class="aid">B</span></td><td>Moderate growth + some leverage</td><td class="num">10%</td><td class="num">10%</td><td class="num">20×</td><td class="num">3×</td><td><span class="best">Q2 · high rate + QE</span></td></tr>
+          <tr><td><span class="aid">C</span></td><td>High growth + high leverage</td><td class="num">20%</td><td class="num">10%</td><td class="num">25×</td><td class="num">5×</td><td><span class="best">Q3 · low rate + QT</span></td></tr>
+          <tr><td><span class="aid">D</span></td><td>Hyper-growth, unprofitable</td><td class="num">50%+</td><td class="num">— loss</td><td class="num">—</td><td class="num">— neg</td><td><span class="best">Q1 · most liquid</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="reveal" style="margin-top:18px;color:var(--text-soft);font-size:14.5px;max-width:72ch">
+      ⚠ <b style="color:var(--text)">The Archetype-D rule:</b> in Q1 you can be aggressive — but exit at the <em>first</em> sign of tightening (rates ticking up, QE ending). Take the profit and hit sell; don't get swayed by the hype.
+    </p>
+  </section>
+
+  <!-- VALUATION -->
+  <section id="valuation">
+    <div class="sec-head reveal">
+      <div class="eyebrow">04 — The valuation toolkit</div>
+      <h2 class="serif">How to actually price a company</h2>
+      <p>Two multiples, one leverage gauge, and the mechanism that ties every valuation back to interest rates.</p>
+    </div>
+    <div class="vcards reveal">
+      <div class="vcard">
+        <h3 class="serif">P/E ratio</h3>
+        <span class="formula mono">Market cap ÷ Net income</span>
+        <p>Years to earn back what you paid. <span class="pt">Low P/E isn't automatically cheap</span> — future earnings beat trailing ones. Always use <em>forward</em> P/E, and validate the multiple against peer growth via regression (trust it only at R² &gt; 0.8).</p>
+      </div>
+      <div class="vcard">
+        <h3 class="serif">EV/EBITDA</h3>
+        <span class="formula mono">Enterprise Value ÷ EBITDA</span>
+        <p>Values the whole business <span class="pt">regardless of capital structure</span> — like quoting a house at its full price, not the equity after the mortgage. Best for leveraged, heavy-asset firms and money-losers with real cash flow (early Tesla). Not for banks.</p>
+      </div>
+      <div class="vcard">
+        <h3 class="serif">Debt / EBITDA</h3>
+        <span class="formula mono">Total debt ÷ EBITDA</span>
+        <p>Roughly <span class="pt">how many years of cash flow to repay the debt</span> — the leverage gauge. Matters more every cycle: a company's ability to refinance swings hard with the Fed's rate.</p>
+      </div>
+      <div class="vcard">
+        <h3 class="serif">WACC → the rate bridge</h3>
+        <span class="formula mono">Lower rates → lower WACC → higher value</span>
+        <p><span class="pt">This is why the framework is Fed-centric.</span> Lower rates cut the discount rate on future cash flows (lifting present value and multiples) and push capital out of bonds into stocks.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- INDICATORS -->
+  <section id="indicators">
+    <div class="sec-head reveal">
+      <div class="eyebrow">05 — The instruments</div>
+      <h2 class="serif">Eleven readings that front-run the Fed</h2>
+      <p>Grouped into the three things the Fed watches — jobs, inflation, activity — each with its threshold bands and the series Macropulse pulls. <span class="mono" style="color:var(--liq-mid);font-size:13px">amber tickers</span> = not on FRED (free proxy needed).</p>
+    </div>
+    <div class="igrid reveal">
+
+      <div class="icard">
+        <div class="top"><h3>Unemployment rate</h3><span class="ticker mono">UNRATE</span></div>
+        <div class="cat mono">Job market</div>
+        <div class="gauge"><div class="bar"><i style="background:var(--liq-high)"></i><i style="background:var(--liq-mid)"></i><i style="background:var(--liq-low)"></i></div>
+          <div class="labs mono"><span>&lt;4% strong</span><span>4–5.5%</span><span>&gt;5.5% weak</span></div></div>
+        <div class="reax">High → <b>expansionary</b>. Target ~4%.</div>
+      </div>
+
+      <div class="icard">
+        <div class="top"><h3>Initial jobless claims <span class="lead">lead</span></h3><span class="ticker mono">ICSA</span></div>
+        <div class="cat mono">Job market · weekly</div>
+        <div class="gauge"><div class="bar"><i style="background:var(--liq-high)"></i><i style="background:var(--liq-mid)"></i><i style="background:var(--liq-low)"></i></div>
+          <div class="labs mono"><span>&lt;250k</span><span>250–350k</span><span>&gt;350k</span></div></div>
+        <div class="reax">More claims → <b>expansionary</b>. Leads unemployment.</div>
+      </div>
+
+      <div class="icard">
+        <div class="top"><h3>Non-farm payrolls</h3><span class="ticker mono">PAYEMS</span></div>
+        <div class="cat mono">Job market · monthly Δ</div>
+        <div class="gauge"><div class="bar"><i style="background:var(--liq-low)"></i><i style="background:var(--liq-mid)"></i><i style="background:var(--liq-high)"></i></div>
+          <div class="labs mono"><span>&lt;50k weak</span><span>50–250k</span><span>&gt;250k</span></div></div>
+        <div class="reax">High → <b>contractionary</b> (strong economy).</div>
+      </div>
+
+      <div class="icard">
+        <div class="top"><h3>CPI · year-over-year</h3><span class="ticker mono">CPIAUCSL</span></div>
+        <div class="cat mono">Inflation</div>
+        <div class="gauge"><div class="bar"><i style="background:var(--liq-high)"></i><i style="background:var(--liq-mid)"></i><i style="background:var(--liq-low)"></i></div>
+          <div class="labs mono"><span>&lt;2% low</span><span>~2%</span><span>&gt;2% high</span></div></div>
+        <div class="reax">High → <b>contractionary</b>. Fed target 2%.</div>
+      </div>
+
+      <div class="icard">
+        <div class="top"><h3>Core CPI · YoY</h3><span class="ticker mono">CPILFESL</span></div>
+        <div class="cat mono">Inflation</div>
+        <div class="gauge"><div class="bar"><i style="background:var(--liq-high)"></i><i style="background:var(--liq-mid)"></i><i style="background:var(--liq-low)"></i></div>
+          <div class="labs mono"><span>&lt;2%</span><span>~2%</span><span>&gt;2%</span></div></div>
+        <div class="reax">CPI ex food &amp; energy — cleaner signal.</div>
+      </div>
+
+      <div class="icard">
+        <div class="top"><h3>PPI · month-over-month <span class="lead">lead</span></h3><span class="ticker mono">PPIFIS</span></div>
+        <div class="cat mono">Inflation</div>
+        <div class="gauge"><div class="bar"><i style="background:var(--liq-high)"></i><i style="background:var(--liq-mid)"></i><i style="background:var(--liq-low)"></i></div>
+          <div class="labs mono"><span>&lt;0%</span><span>0–0.2%</span><span>&gt;0.2%</span></div></div>
+        <div class="reax">Producer prices — <b>leads CPI</b> as costs pass through.</div>
+      </div>
+
+      <div class="icard">
+        <div class="top"><h3>Core PCE · YoY</h3><span class="ticker mono">PCEPILFE</span></div>
+        <div class="cat mono">Inflation · Fed's favorite</div>
+        <div class="gauge"><div class="bar"><i style="background:var(--liq-high)"></i><i style="background:var(--liq-mid)"></i><i style="background:var(--liq-low)"></i></div>
+          <div class="labs mono"><span>&lt;2%</span><span>~2%</span><span>&gt;2%</span></div></div>
+        <div class="reax">The Fed's <b>preferred</b> inflation gauge.</div>
+      </div>
+
+      <div class="icard">
+        <div class="top"><h3>ISM Manufacturing <span class="lead">lead</span></h3><span class="ticker mono proxy">PROXY</span></div>
+        <div class="cat mono">Activity · survey</div>
+        <div class="gauge"><div class="bar"><i style="background:var(--liq-low)"></i><i style="background:var(--liq-mid)"></i><i style="background:var(--liq-high)"></i></div>
+          <div class="labs mono"><span>&lt;50 contract</span><span>50</span><span>&gt;55 expand</span></div></div>
+        <div class="reax">Fed's favorite real-economy lead. <b>S&amp;P Global PMI</b> proxy.</div>
+      </div>
+
+      <div class="icard">
+        <div class="top"><h3>ISM Services <span class="lead">lead</span></h3><span class="ticker mono proxy">PROXY</span></div>
+        <div class="cat mono">Activity · ~70% of GDP</div>
+        <div class="gauge"><div class="bar"><i style="background:var(--liq-low)"></i><i style="background:var(--liq-mid)"></i><i style="background:var(--liq-high)"></i></div>
+          <div class="labs mono"><span>&lt;50</span><span>50</span><span>&gt;55</span></div></div>
+        <div class="reax">Services dominate the economy; prices stickier.</div>
+      </div>
+
+      <div class="icard">
+        <div class="top"><h3>Chicago PMI <span class="lead">lead</span></h3><span class="ticker mono proxy">PROXY</span></div>
+        <div class="cat mono">Activity · Midwest</div>
+        <div class="gauge"><div class="bar"><i style="background:var(--liq-low)"></i><i style="background:var(--liq-mid)"></i><i style="background:var(--liq-high)"></i></div>
+          <div class="labs mono"><span>&lt;50</span><span>50</span><span>&gt;55</span></div></div>
+        <div class="reax">Leads national ISM by <b>1–2 months</b>.</div>
+      </div>
+
+      <div class="icard">
+        <div class="top"><h3>Consumer Confidence <span class="lead">lead</span></h3><span class="ticker mono proxy">UMCSENT*</span></div>
+        <div class="cat mono">Activity · survey</div>
+        <div class="gauge"><div class="bar"><i style="background:var(--liq-low)"></i><i style="background:var(--liq-mid)"></i><i style="background:var(--liq-high)"></i></div>
+          <div class="labs mono"><span>&lt;100 weak</span><span>100–120</span><span>&gt;120</span></div></div>
+        <div class="reax">Strong → <b>contractionary</b>. *UMich proxy, diff. scale.</div>
+      </div>
+
+      <div class="icard" style="border-color:var(--line-strong);background:var(--bg-tint)">
+        <div class="top"><h3>Two more Fed dials</h3></div>
+        <div class="cat mono">Always on the desk</div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:13.5px">Policy rate</span><span class="ticker mono">FEDFUNDS</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:13.5px">Balance sheet</span><span class="ticker mono">WALCL</span></div>
+        </div>
+        <div class="reax">The two levers from §01 — the axes of the whole matrix.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- TIMING -->
+  <section id="timing">
+    <div class="sec-head reveal">
+      <div class="eyebrow">06 — The entry system</div>
+      <h2 class="serif">Five signals. ~80–85% win-rate.</h2>
+      <p>A simplified checklist for timing entries. When all five line up at once, history rewards the buyer. But three systemic conditions can override the whole model.</p>
+    </div>
+    <div class="check reveal">
+      <div class="citem"><span class="no serif">1</span><div><h3>VIX above 30</h3><p>Fear is priced in (calm ≈ 15–20). High fear = the moment to buy.</p><span class="m mono">VIXCLS</span></div></div>
+      <div class="citem"><span class="no serif">2</span><div><h3>Fed not on a hiking path</h3><p>Signaling flat or lower rates via the dot plot — no valuation headwind.</p><span class="m mono">FEDFUNDS · dot plot</span></div></div>
+      <div class="citem"><span class="no serif">3</span><div><h3>Margin debt falling</h3><p>Market already deleveraged ~a month → dry powder to re-leverage up.</p><span class="m mono">FINRA · scrape</span></div></div>
+      <div class="citem"><span class="no serif">4</span><div><h3>A clear leading sector</h3><p>A theme pulling in institutional capital (Mag 7 '25; semiconductors '26).</p><span class="m mono">sector strength</span></div></div>
+      <div class="citem"><span class="no serif">5</span><div><h3>Leaders' earnings rising</h3><p>The theme beats EPS/revenue <em>during</em> the panic — business insulated from fear.</p><span class="m mono">earnings data</span></div></div>
+      <div class="citem" style="border-color:var(--line-strong);align-items:center"><span class="no serif" style="color:var(--accent)">✓</span><div><h3>All five checked</h3><p style="color:var(--text)">Historical win-rate ~80–85% since 2008. The other 15–20% is the override risk →</p></div></div>
+    </div>
+    <div class="override reveal">
+      <h3 class="serif">When the model breaks — systemic overrides</h3>
+      <p>The checklist assumes the Fed is <em>able and willing</em> to save the market. These three conditions can overwhelm it, sending markets lower even with all five boxes checked.</p>
+      <div class="omons">
+        <div class="omon"><div class="h"><span class="warn">▲</span> Credit crunch</div><p>The single most important tell. When the high-yield spread blows out, companies can't refinance — a spiral the Fed may not stop.</p><span class="t mono">BAMLH0A0HYM2</span></div>
+        <div class="omon"><div class="h"><span class="warn">▲</span> Inflation too high</div><p>If inflation runs hot the Fed <em>can't</em> ease (see 1973). Rule of thumb: CPI needs to be below ~2.5%.</p><span class="t mono">CPIAUCSL</span></div>
+        <div class="omon"><div class="h"><span class="warn">▲</span> Accounting fraud</div><p>If trust in financial statements breaks, no Fed action helps (Enron, WorldCom, Tyco — 2002).</p><span class="t mono">qualitative</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MINDSET -->
+  <section id="mindset">
+    <div class="sec-head reveal">
+      <div class="eyebrow">07 — The differentiator</div>
+      <h2 class="serif">Knowledge without temperament fails</h2>
+      <p>The most-stressed lesson: plenty of people with 15+ years in banking, PE, and hedge funds still lose money personally. The variable isn't knowledge — it's mindset.</p>
+    </div>
+    <div class="principles reveal">
+      <div class="pr"><div class="pn serif">1</div><div><h3 class="serif">Have your own principle — and stick to it</h3><p>Every strategy works for <em>someone</em>; none works for everyone. Match the approach to your character. His: mid/long-term, valuation-driven, macro-timed.</p></div></div>
+      <div class="pr"><div class="pn serif">2</div><div><h3 class="serif">Don't get swayed by noise</h3><p>The moment you chase someone else's win, you become a follower dragged into the game — not a decision-maker. <em>(See his "lost $100k in a day" story.)</em></p></div></div>
+      <div class="pr"><div class="pn serif">3</div><div><h3 class="serif">Review your principle regularly</h3><p>Markets evolve; test your strategy honestly and stay nimble — but adapt with your own logic, never by copying others.</p></div></div>
+      <div class="pr"><div class="pn serif">4</div><div><h3 class="serif">Remove emotion after you invest</h3><p>Treat invested money as someone else's. <em>Red flag: checking your balance more than three times a day on a long-term hold.</em></p></div></div>
+      <div class="pr"><div class="pn serif">5</div><div><h3 class="serif">Don't tell others what you bought</h3><p>Sharing makes you anxious about being right in front of others, which erodes discipline. Keep your thesis to yourself.</p></div></div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="foot">
+    <div class="next reveal">
+      <div class="eyebrow">What's next</div>
+      <h3 class="serif">From playbook to live dashboard</h3>
+      <p>Because <span class="mono" style="color:var(--accent);font-size:14px">FEDFUNDS</span> and <span class="mono" style="color:var(--accent);font-size:14px">WALCL</span> are both live on FRED, Macropulse auto-detects today's regime, surfaces the matching archetype, and runs the signal checklist against live data.</p>
+    </div>
+    <div class="meta">
+      <span>MACROPULSE · THE LIQUIDITY PLAYBOOK</span>
+    </div>
+    <p class="disclaimer">Educational documentation of Macropulse's model. Not financial advice. The thresholds and rules are heuristics.</p>
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, {threshold:.12, rootMargin:"0px 0px -8% 0px"});
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+
+  // hero liquidity line draw-in
+  var path = document.querySelector('.hero-line .draw');
+  if(path && !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    try{
+      var len = path.getTotalLength();
+      path.style.strokeDasharray = len;
+      path.style.strokeDashoffset = len;
+      path.getBoundingClientRect();
+      path.style.transition = 'stroke-dashoffset 2.2s cubic-bezier(.4,.5,.2,1)';
+      requestAnimationFrame(function(){ path.style.strokeDashoffset = '0'; });
+    }catch(e){}
+  }
+
+  // smooth-scroll for nav
+  document.querySelectorAll('.nav-links a, .brand').forEach(function(a){
+    a.addEventListener('click', function(ev){
+      var href = a.getAttribute('href');
+      if(href && href.charAt(0)==='#'){
+        var t = document.querySelector(href);
+        if(t){ ev.preventDefault(); t.scrollIntoView({behavior:'smooth', block:'start'}); }
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

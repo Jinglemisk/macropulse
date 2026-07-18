@@ -9,7 +9,7 @@
 ## What it does
 
 - Classifies equities into four buckets (A · B · C · D) from growth, valuation and leverage metrics.
-- Runs a US macro regime model (FPS / GPS over 13 indicators) and turns it into a recommended A/B/C/D allocation.
+- Runs a US macro regime model (FPS / GPS over 10 indicators) and turns it into a recommended A/B/C/D allocation.
 - Stores positions, fundamentals, notes, and historical classifications in a local SQLite file.
 - Presents everything through a switchable, keyboard-driven terminal UI with three layout modes and four palettes.
 
@@ -126,7 +126,16 @@ Base liquidity regime (`Most Liquid` → `In Between (prefer C)` → `In Between
 - **FPS** — Fed Pressure Score
 - **GPS** — Growth Pulse Score
 
-Both run on 13 indicators with per-indicator weights. The output is an A/B/C/D allocation tilt; full breakdown lives in [docs/FPS_GPS_IMPLEMENTATION.md](./docs/FPS_GPS_IMPLEMENTATION.md).
+Both run on 10 indicators with per-indicator weights. The output is an A/B/C/D allocation tilt; full breakdown lives in [docs/regime-engine.md](./docs/regime-engine.md).
+
+## Documentation
+
+Full docs live in [`docs/`](./docs):
+
+- **Strategy** — [`docs/framework/`](./docs/framework): [regime](./docs/framework/regime.md) · [valuation](./docs/framework/valuation.md) · [indicators](./docs/framework/indicators.md) · [signals](./docs/framework/signals.md) · [mindset](./docs/framework/mindset.md)
+- **Implementation** — [classification.md](./docs/classification.md) (A/B/C/D classifier) · [regime-engine.md](./docs/regime-engine.md) (FPS/GPS + allocation)
+- **Visual overview** — [`docs/showcase.html`](./docs/showcase.html)
+- **Plans** — [IMPROVEMENT-PLAN.md](./IMPROVEMENT-PLAN.md) (known bugs & roadmap) · [DOCS-CLEANUP-PLAN.md](./DOCS-CLEANUP-PLAN.md)
 
 ## Refresh model
 
@@ -161,10 +170,11 @@ portfolio-app/
 │       ├── config/defaultSettings.js # inlined fallback for settings.json
 │       └── utils/cssVars.js          # palette → CSS var application
 ├── docs/
-│   ├── FPS_GPS_IMPLEMENTATION.md
-│   └── how-to-invest.md
+│   ├── framework/                    # strategy: regime · valuation · indicators · signals · mindset
+│   ├── classification.md             # A/B/C/D stock classifier spec
+│   ├── regime-engine.md              # FPS/GPS scoring + allocation
+│   └── showcase.html                 # visual overview
 ├── scripts/{setup,doctor,initDb,fetchMacroData}.js
-├── layout.md                         # ASCII wireframes for all three layouts
 ├── requirements.txt · .env.example
 ```
 
