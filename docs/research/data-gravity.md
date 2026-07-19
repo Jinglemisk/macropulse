@@ -94,4 +94,4 @@ AND-gate, so each signal has near-total veto gravity.
 confidence scale) is **free** to fix (FRED + code). The only genuinely cost-gated
 gravity is **forward estimates**, concentrated in the classifier (50%) and entry
 signal ⑤ — the one place ~$22/mo (or a free-tier test) buys real accuracy. See
-[DATA-SOURCES.md](DATA-SOURCES.md).
+[data-sources.md](data-sources.md).

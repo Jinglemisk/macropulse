@@ -130,12 +130,13 @@ Both run on 10 indicators with per-indicator weights. The output is an A/B/C/D a
 
 ## Documentation
 
-Full docs live in [`docs/`](./docs):
+Full docs are indexed in [`docs/README.md`](./docs/README.md):
 
-- **Strategy** — [`docs/framework/`](./docs/framework): [regime](./docs/framework/regime.md) · [valuation](./docs/framework/valuation.md) · [indicators](./docs/framework/indicators.md) · [signals](./docs/framework/signals.md) · [mindset](./docs/framework/mindset.md)
+- **Strategy** — [`docs/framework/`](./docs/framework/README.md): [regime](./docs/framework/regime.md) · [valuation](./docs/framework/valuation.md) · [indicators](./docs/framework/indicators.md) · [signals](./docs/framework/signals.md) · [mindset](./docs/framework/mindset.md)
 - **Implementation** — [classification.md](./docs/classification.md) (A/B/C/D classifier) · [regime-engine.md](./docs/regime-engine.md) (FPS/GPS + allocation)
 - **Visual overview** — [`docs/showcase.html`](./docs/showcase.html)
-- **Plans** — [IMPROVEMENT-PLAN.md](./IMPROVEMENT-PLAN.md) (known bugs & roadmap) · [DOCS-CLEANUP-PLAN.md](./DOCS-CLEANUP-PLAN.md)
+- **Planning and status** — [master plan](./docs/planning/master-plan.md) · [improvement plan](./docs/planning/improvement-plan.md) · [buy/sell-signals status](./docs/status/buy-sell-signals.md)
+- **Research** — [data gravity](./docs/research/data-gravity.md) · [data sources](./docs/research/data-sources.md)
 
 ## Refresh model
 
@@ -170,7 +171,11 @@ portfolio-app/
 │       ├── config/defaultSettings.js # inlined fallback for settings.json
 │       └── utils/cssVars.js          # palette → CSS var application
 ├── docs/
+│   ├── README.md                     # documentation index
 │   ├── framework/                    # strategy: regime · valuation · indicators · signals · mindset
+│   ├── planning/                     # roadmaps and implementation plans
+│   ├── research/                     # data-source and model-impact analysis
+│   ├── status/                       # feature status notes
 │   ├── classification.md             # A/B/C/D stock classifier spec
 │   ├── regime-engine.md              # FPS/GPS scoring + allocation
 │   └── showcase.html                 # visual overview

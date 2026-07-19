@@ -3,7 +3,7 @@
 How Macropulse turns macro data into a regime and an A/B/C/D allocation. This
 documents the **shipped code**; for the strategy behind it see
 [`framework/regime.md`](framework/regime.md), and for known correctness issues see
-[`../IMPROVEMENT-PLAN.md`](../IMPROVEMENT-PLAN.md).
+[`planning/improvement-plan.md`](planning/improvement-plan.md).
 
 > **Where the values live.** The numbers that actually run are hard-coded in
 > `indicatorClassifier.js` (thresholds + score maps), `scoreCalculator.js` (weights),

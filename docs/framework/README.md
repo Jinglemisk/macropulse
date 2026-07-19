@@ -26,7 +26,7 @@ These documents describe the *strategy*. For how the engine actually implements 
 
 - **Stock classification** (the A/B/C/D fuzzy classifier) → [`../classification.md`](../classification.md)
 - **Regime + FPS/GPS scoring + allocation** → [`../regime-engine.md`](../regime-engine.md)
-- **Known correctness issues** in the current build → [`../../IMPROVEMENT-PLAN.md`](../../IMPROVEMENT-PLAN.md)
+- **Known correctness issues** in the current build → [`../planning/improvement-plan.md`](../planning/improvement-plan.md)
 
 > This is educational documentation of Macropulse's model, not financial advice. The
 > thresholds and rules are heuristics.

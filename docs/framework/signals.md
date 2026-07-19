@@ -18,7 +18,7 @@ When all five are met and no sell rule is active, the verdict is **BUY**.
 
 > ⚠️ **Signal 3 caveat.** The concept is *investor margin debt* falling (e.g. FINRA
 > margin statistics). Macropulse currently proxies this with the **Fed balance sheet
-> (`WALCL`)**, which is a different quantity. See [`../../IMPROVEMENT-PLAN.md`](../../IMPROVEMENT-PLAN.md)
+> (`WALCL`)**, which is a different quantity. See [`../planning/improvement-plan.md`](../planning/improvement-plan.md)
 > (DD-7 / DS-4).
 
 ## Sell rules (any one active → SELL)
