@@ -35,7 +35,7 @@ workarounds for missing feeds. **Resolve the data-source access review first** �
 some "fixes" may be blocked or reshaped by what data we can actually get.
 
 ## When we resume
-Tracked in the improvement plan (on `main`, `IMPROVEMENT-PLAN.md`): **DD-7** (margin
+Tracked in the [improvement plan](../planning/improvement-plan.md): **DD-7** (margin
 proxy), **DD-9** (sell rules vs overrides), **DS-1** (credit spread — free on FRED),
 **DS-4** (FINRA margin). First steps when we return: de-time-bomb the test, add the
 credit-spread override (free), correct signal ③/⑤, then decide the rest based on the

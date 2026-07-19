@@ -77,8 +77,8 @@ fragile link.
 
 ## Integration notes (Node + FRED + OpenBB/Python + Yahoo)
 - **No new keys needed** for the credit spread or core PCE — they're FRED series;
-  add to `MACRO_SERIES` + a `macro_data` column (see `IMPROVEMENT-PLAN.md`
-  add-a-series checklist).
+  add to `MACRO_SERIES` + a `macro_data` column (see the
+  [improvement plan](../planning/improvement-plan.md) add-a-series checklist).
 - **Only justified spend:** FMP Starter ~$22/mo for estimates — and only after the
   free-tier test fails.
 - **Keep** Yahoo/OpenBB for prices; add Stooq as a free backfill hedge.

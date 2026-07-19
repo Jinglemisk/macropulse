@@ -29,7 +29,7 @@ proprietary and not on FRED). Consumer sentiment uses Michigan's `UMCSENT`.
 
 > ⚠️ Several of these indicators are currently mis-scaled in the running code
 > (raw levels compared to rate-of-change thresholds; a sentiment scale mismatch).
-> See [`../../IMPROVEMENT-PLAN.md`](../../IMPROVEMENT-PLAN.md) Order 1 before trusting
+> See [`../planning/improvement-plan.md`](../planning/improvement-plan.md) Order 1 before trusting
 > the activity/inflation readings.
 
 ## Regime levers and context series

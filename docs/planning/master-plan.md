@@ -4,10 +4,10 @@ The single, self-contained tracker for all outstanding work. Consolidates the
 regime-engine bug fixes, the buy/sell-signals feature completion, the data-source
 decisions, the data-gravity mitigations, and the design calls.
 
-**Feeder docs:** [`docs/DATA-GRAVITY.md`](docs/DATA-GRAVITY.md) (how much each gap
-distorts decisions) · [`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md) (what data we
-can get) · [`SIGNALS-STATUS.md`](SIGNALS-STATUS.md) (buy/sell feature status) ·
-`IMPROVEMENT-PLAN.md` (on `main`, original Order 1/2/3 detail).
+**Feeder docs:** [`data-gravity.md`](../research/data-gravity.md) (how much each gap
+distorts decisions) · [`data-sources.md`](../research/data-sources.md) (what data we
+can get) · [`buy-sell-signals.md`](../status/buy-sell-signals.md) (buy/sell feature
+status) · [`improvement-plan.md`](improvement-plan.md) (original Order 1/2/3 detail).
 
 **Legend:** `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` decided-not-to ·
 tags: **`free`** (code/FRED only) · **`paid`** (needs $) · **`decision`** (needs a
